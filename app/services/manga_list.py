@@ -2,9 +2,9 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from pydoll.browser.chromium import Chrome
-from pydoll.browser.options import ChromiumOptions
 from pydoll.extractor import ExtractionModel, Field
 
+from app.core.browser import get_chrome_options
 from app.core.config import LIST_URL, SCRAPE_TIMEOUT
 
 
@@ -35,7 +35,7 @@ class MangaListItem(ExtractionModel):
 
 
 async def get_manga_list(page: int = 1) -> list[MangaListItem]:
-    options = ChromiumOptions()
+    options = get_chrome_options()
 
     async with Chrome(options=options) as browser:
         tab = await browser.start()

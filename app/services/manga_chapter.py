@@ -1,8 +1,8 @@
 from typing import Any
 
 from pydoll.browser.chromium import Chrome
-from pydoll.browser.options import ChromiumOptions
 
+from app.core.browser import get_chrome_options
 from app.core.config import BASE_URL, SCRAPE_TIMEOUT
 from app.utils.image import fetch_images_from_selector
 
@@ -10,7 +10,7 @@ CHAPTER_IMAGE_SELECTOR = 'div.container-chapter-reader img'
 
 
 async def get_manga_chapter(manga_slug: str, chapter_slug: str) -> dict[str, Any]:
-    options = ChromiumOptions()
+    options = get_chrome_options()
     url = f'{BASE_URL}/manga/{manga_slug}/{chapter_slug}'
 
     async with Chrome(options=options) as browser:

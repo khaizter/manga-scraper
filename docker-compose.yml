@@ -1,0 +1,10 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      CHROME_BIN: /usr/bin/google-chrome
+      CHROME_HEADLESS: "false"
+    shm_size: "2gb"
+    restart: unless-stopped
