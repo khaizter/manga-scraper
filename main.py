@@ -45,7 +45,7 @@ def manga_detail(
     """Scrape manga details by slug."""
     typer.echo(f'Scraping {BASE_URL}/manga/{slug} ...')
     detail = asyncio.run(scrape_manga(slug))
-    payload = {'slug': slug, **detail.model_dump()}
+    payload = {'slug': slug, **detail}
     typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
 
 
