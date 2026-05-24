@@ -2,9 +2,12 @@ services:
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       CHROME_BIN: /usr/bin/google-chrome
       CHROME_HEADLESS: "false"
+      DISPLAY: ":99"
+    volumes:
+      - ./app:/app/app
     shm_size: "2gb"
     restart: unless-stopped

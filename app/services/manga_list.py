@@ -1,11 +1,16 @@
-from typing import Optional
+import asyncio
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 from pydoll.browser.chromium import Chrome
 from pydoll.extractor import ExtractionModel, Field
 
-from app.core.browser import get_chrome_options
+from app.core.browser import get_chrome_options, navigate_to
 from app.core.config import LIST_URL, SCRAPE_TIMEOUT
+from app.utils.image import fetch_image_data_uri_from_element
+
+LIST_ITEM_SCOPE = 'div.comic-list div.list-comic-item-wrap'
+COVER_IMAGE_SELECTOR = 'a.cover > img'
 
 
 def extract_slug(url: str) -> str:
@@ -34,14 +39,43 @@ class MangaListItem(ExtractionModel):
     )
 
 
-async def get_manga_list(page: int = 1) -> list[MangaListItem]:
+async def get_list_item_image_data_uri(container) -> str:
+    img = await container.query(COVER_IMAGE_SELECTOR, raise_exc=False)
+    if not img:
+        return ''
+    return await fetch_image_data_uri_from_element(img) or ''
+
+
+async def get_manga_list(page: int = 1) -> list[dict[str, Any]]:
     options = get_chrome_options()
 
     async with Chrome(options=options) as browser:
         tab = await browser.start()
-        await tab.go_to(f'{LIST_URL}?page={page}')
-        return await tab.extract_all(
+        await navigate_to(tab, f'{LIST_URL}?page={page}')
+        items = await tab.extract_all(
             MangaListItem,
-            scope='div.comic-list div.list-comic-item-wrap',
+            scope=LIST_ITEM_SCOPE,
             timeout=SCRAPE_TIMEOUT,
         )
+
+        if not items:
+            return []
+
+        containers = await tab.query(
+            LIST_ITEM_SCOPE,
+            find_all=True,
+            timeout=SCRAPE_TIMEOUT,
+            raise_exc=False,
+        )
+
+        if not containers:
+            return [{**item.model_dump(), 'imageDataUri': ''} for item in items]
+
+        image_data_uris = await asyncio.gather(
+            *[get_list_item_image_data_uri(container) for container in containers]
+        )
+
+        return [
+            {**item.model_dump(), 'imageDataUri': image_data_uri}
+            for item, image_data_uri in zip(items, image_data_uris)
+        ]

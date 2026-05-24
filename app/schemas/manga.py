@@ -9,6 +9,7 @@ class MangaListItemResponse(BaseModel):
     title: str
     slug: str
     description: str | None = None
+    imageDataUri: str
 
 
 class MangaListResponse(BaseModel):

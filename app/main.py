@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from pydoll.exceptions import WaitElementTimeout
 
 from app.api.router import api_router
 
@@ -9,6 +11,20 @@ app = FastAPI(
 )
 
 app.include_router(api_router)
+
+
+@app.exception_handler(WaitElementTimeout)
+async def scrape_timeout_handler(_request: Request, exc: WaitElementTimeout) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            'detail': (
+                'Scrape timed out waiting for page content. '
+                'The site may be blocking automated access.'
+            ),
+            'error': str(exc),
+        },
+    )
 
 
 @app.get('/health')

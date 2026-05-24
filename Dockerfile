@@ -25,11 +25,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY cli.py .
+COPY entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -f http://127.0.0.1:8000/health || exit 1
 
-CMD ["xvfb-run", "-a", "--server-args=-screen 0 1920x1080x24", \
-     "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["/entrypoint.sh"]

@@ -23,7 +23,7 @@ async def manga_list(body: MangaListRequest) -> MangaListResponse:
 
     return MangaListResponse(
         page=body.page,
-        items=[MangaListItemResponse.model_validate(item.model_dump()) for item in items],
+        items=[MangaListItemResponse.model_validate(item) for item in items],
     )
 
 

@@ -34,8 +34,8 @@ def list_manga(
 
     typer.echo(f'Found {len(mangas)} manga:\n')
     for manga in mangas:
-        typer.echo(f'{manga.title}: {manga.slug}')
-        typer.echo(manga.model_dump_json())
+        typer.echo(f"{manga['title']}: {manga['slug']}")
+        typer.echo(json.dumps(manga, ensure_ascii=False))
 
 
 @app.command('detail')

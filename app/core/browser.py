@@ -1,6 +1,7 @@
 import os
 
 from pydoll.browser.options import ChromiumOptions
+from pydoll.browser.tab import Tab
 
 
 def get_chrome_options() -> ChromiumOptions:
@@ -22,3 +23,13 @@ def get_chrome_options() -> ChromiumOptions:
         options.add_argument('--headless=new')
 
     return options
+
+
+async def navigate_to(tab: Tab, url: str) -> None:
+    """Navigate with Cloudflare Turnstile bypass enabled."""
+    await tab.enable_auto_solve_cloudflare_captcha()
+    try:
+        async with tab.expect_and_bypass_cloudflare_captcha(time_to_wait_captcha=30):
+            await tab.go_to(url)
+    finally:
+        await tab.disable_auto_solve_cloudflare_captcha()

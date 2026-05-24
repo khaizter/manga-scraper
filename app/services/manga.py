@@ -4,7 +4,7 @@ from pydoll.browser.chromium import Chrome
 from pydoll.browser.tab import Tab
 from pydoll.extractor import ExtractionModel, Field
 
-from app.core.browser import get_chrome_options
+from app.core.browser import get_chrome_options, navigate_to
 from app.core.config import BASE_URL, SCRAPE_TIMEOUT
 from app.utils.image import fetch_image_data_uri_from_element
 
@@ -50,7 +50,7 @@ async def get_manga(slug: str) -> dict[str, Any]:
 
     async with Chrome(options=options) as browser:
         tab = await browser.start()
-        await tab.go_to(f'{BASE_URL}/manga/{slug}')
+        await navigate_to(tab, f'{BASE_URL}/manga/{slug}')
         detail = await tab.extract(MangaDetail, timeout=SCRAPE_TIMEOUT)
         cover = await get_cover_image(tab)
 

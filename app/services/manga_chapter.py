@@ -2,7 +2,7 @@ from typing import Any
 
 from pydoll.browser.chromium import Chrome
 
-from app.core.browser import get_chrome_options
+from app.core.browser import get_chrome_options, navigate_to
 from app.core.config import BASE_URL, SCRAPE_TIMEOUT
 from app.utils.image import fetch_image_data_uris_from_selector
 
@@ -15,7 +15,7 @@ async def get_manga_chapter(manga_slug: str, chapter_slug: str) -> dict[str, Any
 
     async with Chrome(options=options) as browser:
         tab = await browser.start()
-        await tab.go_to(url)
+        await navigate_to(tab, url)
         pages = await fetch_image_data_uris_from_selector(
             tab,
             CHAPTER_IMAGE_SELECTOR,
