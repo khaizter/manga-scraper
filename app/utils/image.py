@@ -41,12 +41,9 @@ def image_mime_type(url: str) -> str:
     return 'image/jpeg'
 
 
-def build_image_payload(image_base64: str, url: str) -> dict[str, str]:
+def build_image_data_uri(image_base64: str, url: str) -> str:
     mime = image_mime_type(url)
-    return {
-        'image': image_base64,
-        'imageDataUri': f'data:{mime};base64,{image_base64}',
-    }
+    return f'data:{mime};base64,{image_base64}'
 
 
 async def fetch_image_base64(url: str) -> str:
@@ -67,19 +64,19 @@ async def get_image_url(img: WebElement) -> str:
     return normalize_image_url(image_url) if image_url else ''
 
 
-async def fetch_image_payload(url: str) -> dict[str, str]:
+async def fetch_image_data_uri(url: str) -> str:
     image = await fetch_image_base64(url)
-    return build_image_payload(image, url)
+    return build_image_data_uri(image, url)
 
 
-async def fetch_image_payload_from_element(img: WebElement) -> dict[str, str] | None:
+async def fetch_image_data_uri_from_element(img: WebElement) -> str | None:
     url = await get_image_url(img)
     if not url:
         return None
-    return await fetch_image_payload(url)
+    return await fetch_image_data_uri(url)
 
 
-async def fetch_images_from_selector(tab: Tab, selector: str, *, timeout: int = 30) -> list[dict[str, str]]:
+async def fetch_image_data_uris_from_selector(tab: Tab, selector: str, *, timeout: int = 30) -> list[str]:
     imgs = await tab.query(selector, find_all=True, timeout=timeout, raise_exc=False)
     if not imgs:
         return []
@@ -93,4 +90,4 @@ async def fetch_images_from_selector(tab: Tab, selector: str, *, timeout: int = 
     if not urls:
         return []
 
-    return list(await asyncio.gather(*[fetch_image_payload(url) for url in urls]))
+    return list(await asyncio.gather(*[fetch_image_data_uri(url) for url in urls]))

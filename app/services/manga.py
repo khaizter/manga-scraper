@@ -6,7 +6,7 @@ from pydoll.extractor import ExtractionModel, Field
 
 from app.core.browser import get_chrome_options
 from app.core.config import BASE_URL, SCRAPE_TIMEOUT
-from app.utils.image import fetch_image_payload_from_element
+from app.utils.image import fetch_image_data_uri_from_element
 
 COVER_IMAGE_SELECTOR = 'div.manga-info-pic img'
 
@@ -39,10 +39,10 @@ class MangaDetail(ExtractionModel):
     )
 
 
-async def get_cover_image(tab: Tab) -> dict[str, str]:
+async def get_cover_image(tab: Tab) -> str:
     img = await tab.query(COVER_IMAGE_SELECTOR, timeout=SCRAPE_TIMEOUT)
-    payload = await fetch_image_payload_from_element(img)
-    return payload or {'image': '', 'imageDataUri': ''}
+    image_data_uri = await fetch_image_data_uri_from_element(img)
+    return image_data_uri or ''
 
 
 async def get_manga(slug: str) -> dict[str, Any]:
@@ -56,5 +56,5 @@ async def get_manga(slug: str) -> dict[str, Any]:
 
     return {
         **detail.model_dump(),
-        **cover,
+        'imageDataUri': cover,
     }

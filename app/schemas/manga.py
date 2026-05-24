@@ -16,21 +16,15 @@ class MangaListResponse(BaseModel):
     items: list[MangaListItemResponse]
 
 
-class ImagePayload(BaseModel):
-    image: str
-    imageDataUri: str
-
-
 class MangaDetailResponse(BaseModel):
     slug: str
     author: str
     status: str
     chapters: list[str]
-    image: str
     imageDataUri: str
 
 
 class MangaChapterResponse(BaseModel):
     mangaSlug: str
     chapterSlug: str
-    pages: list[ImagePayload]
+    pages: list[str]

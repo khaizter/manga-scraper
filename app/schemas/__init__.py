@@ -1,5 +1,4 @@
 from app.schemas.manga import (
-    ImagePayload,
     MangaChapterResponse,
     MangaDetailResponse,
     MangaListItemResponse,
@@ -8,7 +7,6 @@ from app.schemas.manga import (
 )
 
 __all__ = [
-    'ImagePayload',
     'MangaChapterResponse',
     'MangaDetailResponse',
     'MangaListItemResponse',
