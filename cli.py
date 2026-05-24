@@ -4,10 +4,10 @@ import sys
 
 import typer
 
-from image_scraper import BASE_URL
-from scrape_manga import scrape_manga
-from scrape_manga_chapter import scrape_manga_chapter
-from scrape_manga_list import LIST_URL, scrape_manga_list
+from app.core.config import BASE_URL, LIST_URL
+from app.services.manga import get_manga
+from app.services.manga_chapter import get_manga_chapter
+from app.services.manga_list import get_manga_list
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -26,7 +26,7 @@ def list_manga(
 ) -> None:
     """Scrape manga from a genre listing page."""
     typer.echo(f'Scraping {LIST_URL}?page={page} ...')
-    mangas = asyncio.run(scrape_manga_list(page))
+    mangas = asyncio.run(get_manga_list(page))
 
     if not mangas:
         typer.echo('No manga found on this page.', err=True)
@@ -44,7 +44,7 @@ def manga_detail(
 ) -> None:
     """Scrape manga details by slug."""
     typer.echo(f'Scraping {BASE_URL}/manga/{slug} ...')
-    detail = asyncio.run(scrape_manga(slug))
+    detail = asyncio.run(get_manga(slug))
     payload = {'slug': slug, **detail}
     typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
 
@@ -56,7 +56,7 @@ def manga_chapter(
 ) -> None:
     """Scrape chapter page images by manga and chapter slug."""
     typer.echo(f'Scraping {BASE_URL}/manga/{manga_slug}/{chapter_slug} ...')
-    result = asyncio.run(scrape_manga_chapter(manga_slug, chapter_slug))
+    result = asyncio.run(get_manga_chapter(manga_slug, chapter_slug))
 
     if not result['pages']:
         typer.echo('No chapter images found.', err=True)

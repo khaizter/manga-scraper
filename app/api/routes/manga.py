@@ -7,16 +7,16 @@ from app.schemas.manga import (
     MangaListRequest,
     MangaListResponse,
 )
-from scrape_manga import scrape_manga
-from scrape_manga_chapter import scrape_manga_chapter
-from scrape_manga_list import scrape_manga_list
+from app.services.manga import get_manga
+from app.services.manga_chapter import get_manga_chapter
+from app.services.manga_list import get_manga_list
 
 router = APIRouter(prefix='/api', tags=['manga'])
 
 
 @router.post('/mangaList', response_model=MangaListResponse)
-async def get_manga_list(body: MangaListRequest) -> MangaListResponse:
-    items = await scrape_manga_list(body.page)
+async def manga_list(body: MangaListRequest) -> MangaListResponse:
+    items = await get_manga_list(body.page)
 
     if not items:
         raise HTTPException(status_code=404, detail='No manga found on this page')
@@ -28,8 +28,8 @@ async def get_manga_list(body: MangaListRequest) -> MangaListResponse:
 
 
 @router.get('/manga/{slug}/{chapter_slug}', response_model=MangaChapterResponse)
-async def get_manga_chapter(slug: str, chapter_slug: str) -> MangaChapterResponse:
-    result = await scrape_manga_chapter(slug, chapter_slug)
+async def manga_chapter(slug: str, chapter_slug: str) -> MangaChapterResponse:
+    result = await get_manga_chapter(slug, chapter_slug)
 
     if not result['pages']:
         raise HTTPException(status_code=404, detail='No chapter images found')
@@ -38,6 +38,6 @@ async def get_manga_chapter(slug: str, chapter_slug: str) -> MangaChapterRespons
 
 
 @router.get('/manga/{slug}', response_model=MangaDetailResponse)
-async def get_manga_detail(slug: str) -> MangaDetailResponse:
-    detail = await scrape_manga(slug)
+async def manga_detail(slug: str) -> MangaDetailResponse:
+    detail = await get_manga(slug)
     return MangaDetailResponse(slug=slug, **detail)

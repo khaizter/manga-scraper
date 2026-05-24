@@ -5,7 +5,8 @@ from pydoll.browser.options import ChromiumOptions
 from pydoll.browser.tab import Tab
 from pydoll.extractor import ExtractionModel, Field
 
-from image_scraper import BASE_URL, fetch_image_payload_from_element
+from app.core.config import BASE_URL, SCRAPE_TIMEOUT
+from app.utils.image import fetch_image_payload_from_element
 
 COVER_IMAGE_SELECTOR = 'div.manga-info-pic img'
 
@@ -39,18 +40,18 @@ class MangaDetail(ExtractionModel):
 
 
 async def get_cover_image(tab: Tab) -> dict[str, str]:
-    img = await tab.query(COVER_IMAGE_SELECTOR, timeout=30)
+    img = await tab.query(COVER_IMAGE_SELECTOR, timeout=SCRAPE_TIMEOUT)
     payload = await fetch_image_payload_from_element(img)
     return payload or {'image': '', 'imageDataUri': ''}
 
 
-async def scrape_manga(slug: str) -> dict[str, Any]:
+async def get_manga(slug: str) -> dict[str, Any]:
     options = ChromiumOptions()
 
     async with Chrome(options=options) as browser:
         tab = await browser.start()
         await tab.go_to(f'{BASE_URL}/manga/{slug}')
-        detail = await tab.extract(MangaDetail, timeout=30)
+        detail = await tab.extract(MangaDetail, timeout=SCRAPE_TIMEOUT)
         cover = await get_cover_image(tab)
 
     return {

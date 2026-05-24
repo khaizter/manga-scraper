@@ -5,8 +5,7 @@ from pydoll.browser.chromium import Chrome
 from pydoll.browser.options import ChromiumOptions
 from pydoll.extractor import ExtractionModel, Field
 
-BASE_URL = 'https://www.mangakakalot.gg'
-LIST_URL = f'{BASE_URL}/genre/all'
+from app.core.config import LIST_URL, SCRAPE_TIMEOUT
 
 
 def extract_slug(url: str) -> str:
@@ -35,7 +34,7 @@ class MangaListItem(ExtractionModel):
     )
 
 
-async def scrape_manga_list(page: int = 1) -> list[MangaListItem]:
+async def get_manga_list(page: int = 1) -> list[MangaListItem]:
     options = ChromiumOptions()
 
     async with Chrome(options=options) as browser:
@@ -44,5 +43,5 @@ async def scrape_manga_list(page: int = 1) -> list[MangaListItem]:
         return await tab.extract_all(
             MangaListItem,
             scope='div.comic-list div.list-comic-item-wrap',
-            timeout=30,
+            timeout=SCRAPE_TIMEOUT,
         )

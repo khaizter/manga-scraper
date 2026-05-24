@@ -6,7 +6,7 @@ import aiohttp
 from pydoll.browser.tab import Tab
 from pydoll.elements.web_element import WebElement
 
-BASE_URL = 'https://www.mangakakalot.gg'
+from app.core.config import BASE_URL
 
 IMAGE_MIME_TYPES = {
     '.webp': 'image/webp',
