@@ -1,0 +1,36 @@
+from pydantic import BaseModel, Field
+
+
+class MangaListRequest(BaseModel):
+    page: int = Field(default=1, ge=1, description='Genre listing page number')
+
+
+class MangaListItemResponse(BaseModel):
+    title: str
+    slug: str
+    description: str | None = None
+
+
+class MangaListResponse(BaseModel):
+    page: int
+    items: list[MangaListItemResponse]
+
+
+class ImagePayload(BaseModel):
+    image: str
+    imageDataUri: str
+
+
+class MangaDetailResponse(BaseModel):
+    slug: str
+    author: str
+    status: str
+    chapters: list[str]
+    image: str
+    imageDataUri: str
+
+
+class MangaChapterResponse(BaseModel):
+    mangaSlug: str
+    chapterSlug: str
+    pages: list[ImagePayload]

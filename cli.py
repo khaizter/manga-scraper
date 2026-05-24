@@ -4,6 +4,7 @@ import sys
 
 import typer
 
+from image_scraper import BASE_URL
 from scrape_manga import scrape_manga
 from scrape_manga_chapter import scrape_manga_chapter
 from scrape_manga_list import LIST_URL, scrape_manga_list
@@ -12,8 +13,6 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 app = typer.Typer(help='Scrape manga from mangakakalot.gg')
-
-BASE_URL = 'https://www.mangakakalot.gg'
 
 
 @app.command('list')
