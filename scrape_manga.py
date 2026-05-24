@@ -26,6 +26,10 @@ def strip_label_value(text: str) -> str:
     return text.strip()
 
 
+def chapter_to_slug(text: str) -> str:
+    return text.strip().lower().replace('.', '-').replace(' ', '-')
+
+
 class MangaDetail(ExtractionModel):
     author: str = Field(
         selector='ul.manga-info-text li:nth-child(2)',
@@ -39,7 +43,8 @@ class MangaDetail(ExtractionModel):
     )
     chapters: list[str] = Field(
         selector='div.chapter-list div.row span a',
-        description='Chapter titles',
+        description='Chapter slugs',
+        transform=chapter_to_slug,
     )
 
 
@@ -85,7 +90,7 @@ async def get_cover_image(tab: Tab) -> dict[str, str]:
 
     image = await fetch_image_base64(image_url)
     mime = image_mime_type(image_url)
-    
+
     return {
         'image': image, # Base64 encoded image data
         'imageDataUri': f'data:{mime};base64,{image}', # Data URI for inline display
