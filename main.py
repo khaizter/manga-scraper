@@ -5,6 +5,7 @@ import sys
 import typer
 
 from scrape_manga import scrape_manga
+from scrape_manga_chapter import scrape_manga_chapter
 from scrape_manga_list import LIST_URL, scrape_manga_list
 
 if hasattr(sys.stdout, 'reconfigure'):
@@ -47,6 +48,23 @@ def manga_detail(
     detail = asyncio.run(scrape_manga(slug))
     payload = {'slug': slug, **detail}
     typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+
+
+@app.command('chapter')
+def manga_chapter(
+    manga_slug: str = typer.Argument(help='Manga slug, e.g. black-clover'),
+    chapter_slug: str = typer.Argument(help='Chapter slug, e.g. chapter-336-1'),
+) -> None:
+    """Scrape chapter page images by manga and chapter slug."""
+    typer.echo(f'Scraping {BASE_URL}/manga/{manga_slug}/{chapter_slug} ...')
+    result = asyncio.run(scrape_manga_chapter(manga_slug, chapter_slug))
+
+    if not result['pages']:
+        typer.echo('No chapter images found.', err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Found {len(result['pages'])} page(s):\n")
+    typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 if __name__ == '__main__':
