@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from pydoll.browser.chromium import Chrome
 from pydoll.extractor import ExtractionModel, Field
 
-from app.core.browser import get_chrome_options, navigate_to
+from app.core.browser import get_chrome_options, navigate_to, start_tab
 from app.core.config import LIST_URL, SCRAPE_TIMEOUT
 from app.utils.image import fetch_image_data_uri_from_element
 
@@ -50,7 +50,7 @@ async def get_manga_list(page: int = 1) -> list[dict[str, Any]]:
     options = get_chrome_options()
 
     async with Chrome(options=options) as browser:
-        tab = await browser.start()
+        tab = await start_tab(browser)
         await navigate_to(tab, f'{LIST_URL}?page={page}')
         items = await tab.extract_all(
             MangaListItem,

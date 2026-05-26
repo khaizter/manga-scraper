@@ -1,8 +1,11 @@
+from typing import Any
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from pydoll.exceptions import WaitElementTimeout
+from pydoll.exceptions import FailedToStartBrowser, WaitElementTimeout
 
 from app.api.router import api_router
+from app.core.display import check_virtual_display
 
 app = FastAPI(
     title='Manga Scraper API',
@@ -11,6 +14,20 @@ app = FastAPI(
 )
 
 app.include_router(api_router)
+
+
+@app.exception_handler(FailedToStartBrowser)
+async def browser_start_handler(_request: Request, exc: FailedToStartBrowser) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            'detail': (
+                'Browser failed to start. The virtual display may not be ready yet — '
+                'try restarting the container with: docker compose restart api'
+            ),
+            'error': str(exc),
+        },
+    )
 
 
 @app.exception_handler(WaitElementTimeout)
@@ -27,6 +44,19 @@ async def scrape_timeout_handler(_request: Request, exc: WaitElementTimeout) -> 
     )
 
 
-@app.get('/health')
-async def health_check() -> dict[str, str]:
-    return {'status': 'ok'}
+@app.get('/health', response_model=None)
+async def health_check():
+    display = await check_virtual_display()
+    display_ready = display['ready'] is True
+    display_required = display['configured']
+    healthy = not display_required or display_ready
+
+    body: dict[str, Any] = {
+        'status': 'ok' if healthy else 'unhealthy',
+        'display': display,
+    }
+
+    if not healthy:
+        return JSONResponse(status_code=503, content=body)
+
+    return body
