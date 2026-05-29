@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from pydoll.browser.chromium import Chrome
@@ -21,7 +22,21 @@ def chapter_to_slug(text: str) -> str:
     return text.strip().lower().replace('.', '-').replace(' ', '-')
 
 
+def strip_summary_heading(text: str) -> str:
+    return re.sub(r'^[^\n]*summary:\s*\n*', '', text, flags=re.IGNORECASE).strip()
+
+
 class MangaDetail(ExtractionModel):
+    title: str = Field(
+        selector='ul.manga-info-text li:nth-child(1) h1',
+        description='Manga title',
+    )
+    description: str = Field(
+        selector='div#contentBox',
+        description='Manga synopsis',
+        transform=strip_summary_heading,
+        default='',
+    )
     author: str = Field(
         selector='ul.manga-info-text li:nth-child(2)',
         description='Manga author',

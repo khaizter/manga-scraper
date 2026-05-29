@@ -19,6 +19,8 @@ class MangaListResponse(BaseModel):
 
 class MangaDetailResponse(BaseModel):
     slug: str
+    title: str
+    description: str | None = None
     author: str
     status: str
     chapters: list[str]
