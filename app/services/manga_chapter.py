@@ -6,7 +6,7 @@ from app.core.browser import get_chrome_options, navigate_to, start_tab
 from app.core.config import BASE_URL, SCRAPE_TIMEOUT
 from app.utils.image import fetch_image_data_uris_from_selector
 
-CHAPTER_IMAGE_SELECTOR = 'div.container-chapter-reader img'
+CHAPTER_IMAGE_SELECTOR = 'div.container-chapter-reader > img'
 
 
 async def get_manga_chapter(manga_slug: str, chapter_slug: str) -> dict[str, Any]:
