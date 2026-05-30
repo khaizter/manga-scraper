@@ -30,4 +30,5 @@ class MangaDetailResponse(BaseModel):
 class MangaChapterResponse(BaseModel):
     mangaSlug: str
     chapterSlug: str
+    chapters: list[str]
     pages: list[str]
