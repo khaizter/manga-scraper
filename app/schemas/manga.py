@@ -13,7 +13,8 @@ class MangaListItemResponse(BaseModel):
 
 
 class MangaListResponse(BaseModel):
-    page: int
+    currentPage: int
+    totalPages: int | None = None
     items: list[MangaListItemResponse]
 
 

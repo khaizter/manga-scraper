@@ -16,14 +16,15 @@ router = APIRouter(prefix='/api', tags=['manga'])
 
 @router.post('/mangaList', response_model=MangaListResponse)
 async def manga_list(body: MangaListRequest) -> MangaListResponse:
-    items = await get_manga_list(body.page)
+    result = await get_manga_list(body.page)
 
-    if not items:
+    if not result['items']:
         raise HTTPException(status_code=404, detail='No manga found on this page')
 
     return MangaListResponse(
-        page=body.page,
-        items=[MangaListItemResponse.model_validate(item) for item in items],
+        currentPage=body.page,
+        totalPages=result['totalPages'],
+        items=[MangaListItemResponse.model_validate(item) for item in result['items']],
     )
 
 

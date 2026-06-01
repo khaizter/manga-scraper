@@ -26,13 +26,14 @@ def list_manga(
 ) -> None:
     """Scrape manga from a genre listing page."""
     typer.echo(f'Scraping {LIST_URL}?page={page} ...')
-    mangas = asyncio.run(get_manga_list(page))
+    result = asyncio.run(get_manga_list(page))
+    mangas = result['items']
 
     if not mangas:
         typer.echo('No manga found on this page.', err=True)
         raise typer.Exit(code=1)
 
-    typer.echo(f'Found {len(mangas)} manga:\n')
+    typer.echo(f"Found {len(mangas)} manga (total pages: {result['totalPages']}):\n")
     for manga in mangas:
         typer.echo(f"{manga['title']}: {manga['slug']}")
         typer.echo(json.dumps(manga, ensure_ascii=False))
