@@ -40,7 +40,10 @@ async def manga_chapter(slug: str, chapter_number: str) -> MangaChapterResponse:
     if not result['pages']:
         raise HTTPException(status_code=404, detail='No chapter images found')
 
-    return MangaChapterResponse.model_validate(result)
+    return MangaChapterResponse.model_validate({
+        **result,
+        'chapterSlug': chapter_number,
+    })
 
 
 @router.get('/mangas/{slug}', response_model=MangaDetailResponse)

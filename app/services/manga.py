@@ -1,3 +1,4 @@
+import asyncio
 import re
 from typing import Any
 
@@ -7,6 +8,7 @@ from pydoll.extractor import ExtractionModel, Field
 
 from app.core.browser import get_chrome_options, navigate_to, start_tab
 from app.core.config import BASE_URL, SCRAPE_TIMEOUT
+from app.services.chapters_api import fetch_chapter_numbers
 from app.utils.image import fetch_image_data_uri_from_element
 
 COVER_IMAGE_SELECTOR = 'div.manga-info-pic img'
@@ -16,10 +18,6 @@ def strip_label_value(text: str) -> str:
     if ':' in text:
         return text.split(':', 1)[1].strip()
     return text.strip()
-
-
-def chapter_to_slug(text: str) -> str:
-    return text.strip().lower().replace('.', '-').replace(' ', '-')
 
 
 def strip_summary_heading(text: str) -> str:
@@ -47,11 +45,6 @@ class MangaDetail(ExtractionModel):
         description='Manga status',
         transform=strip_label_value,
     )
-    chapters: list[str] = Field(
-        selector='div.chapter-list div.row span a',
-        description='Chapter slugs',
-        transform=chapter_to_slug,
-    )
 
 
 async def get_cover_image(tab: Tab) -> str:
@@ -60,7 +53,7 @@ async def get_cover_image(tab: Tab) -> str:
     return image_data_uri or ''
 
 
-async def get_manga(slug: str) -> dict[str, Any]:
+async def scrape_manga_detail(slug: str) -> dict[str, Any]:
     options = get_chrome_options()
 
     async with Chrome(options=options) as browser:
@@ -72,4 +65,16 @@ async def get_manga(slug: str) -> dict[str, Any]:
     return {
         **detail.model_dump(),
         'imageDataUri': cover,
+    }
+
+
+async def get_manga(slug: str) -> dict[str, Any]:
+    detail, chapters = await asyncio.gather(
+        scrape_manga_detail(slug),
+        fetch_chapter_numbers(slug),
+    )
+
+    return {
+        **detail,
+        'chapters': chapters,
     }
