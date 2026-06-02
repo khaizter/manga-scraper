@@ -11,10 +11,14 @@ from app.services.manga import get_manga
 from app.services.manga_chapter import get_manga_chapter
 from app.services.manga_list import get_manga_list
 
-router = APIRouter(prefix='/api', tags=['manga'])
+router = APIRouter(prefix='/api', tags=['mangas'])
 
 
-@router.post('/mangaList', response_model=MangaListResponse)
+def to_chapter_slug(chapter_number: str) -> str:
+    return f'chapter-{chapter_number}'
+
+
+@router.post('/mangas', response_model=MangaListResponse)
 async def manga_list(body: MangaListRequest) -> MangaListResponse:
     result = await get_manga_list(body.page)
 
@@ -28,8 +32,9 @@ async def manga_list(body: MangaListRequest) -> MangaListResponse:
     )
 
 
-@router.get('/manga/{slug}/{chapter_slug}', response_model=MangaChapterResponse)
-async def manga_chapter(slug: str, chapter_slug: str) -> MangaChapterResponse:
+@router.get('/mangas/{slug}/chapter/{chapter_number}', response_model=MangaChapterResponse)
+async def manga_chapter(slug: str, chapter_number: str) -> MangaChapterResponse:
+    chapter_slug = to_chapter_slug(chapter_number)
     result = await get_manga_chapter(slug, chapter_slug)
 
     if not result['pages']:
@@ -38,7 +43,7 @@ async def manga_chapter(slug: str, chapter_slug: str) -> MangaChapterResponse:
     return MangaChapterResponse.model_validate(result)
 
 
-@router.get('/manga/{slug}', response_model=MangaDetailResponse)
+@router.get('/mangas/{slug}', response_model=MangaDetailResponse)
 async def manga_detail(slug: str) -> MangaDetailResponse:
     detail = await get_manga(slug)
     return MangaDetailResponse(slug=slug, **detail)
