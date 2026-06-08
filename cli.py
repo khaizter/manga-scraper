@@ -1,10 +1,12 @@
 import asyncio
 import json
+import logging
 import sys
 
 import typer
 
 from app.core.config import BASE_URL, LIST_URL
+from app.pipeline.runner import PipelineRunner
 from app.services.manga import get_manga
 from app.services.manga_chapter import get_manga_chapter
 from app.services.manga_list import get_manga_list
@@ -12,7 +14,11 @@ from app.services.manga_list import get_manga_list
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+
 app = typer.Typer(help='Scrape manga from mangakakalot.gg')
+pipeline_app = typer.Typer(help='Batch pipeline for discovery and sync')
+app.add_typer(pipeline_app, name='pipeline')
 
 
 @app.command('list')
@@ -65,6 +71,42 @@ def manga_chapter(
 
     typer.echo(f"Found {len(result['pages'])} page(s):\n")
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+@pipeline_app.command('discover')
+def pipeline_discover(
+    start_page: int = typer.Option(1, '--start-page', help='First listing page to scan'),
+    page_count: int = typer.Option(1, '--page-count', '-n', help='Number of listing pages to scan'),
+    delay: float = typer.Option(2.0, '--delay', help='Seconds between page navigations'),
+) -> None:
+    """Discover manga slugs from listing pages and enqueue them."""
+    runner = PipelineRunner()
+    stats = asyncio.run(
+        runner.discover(
+            start_page=start_page,
+            page_count=page_count,
+            delay_seconds=delay,
+        )
+    )
+    typer.echo(json.dumps(stats, indent=2, default=str))
+
+
+@pipeline_app.command('sync')
+def pipeline_sync(
+    limit: int = typer.Option(10, '--limit', '-n', help='Max mangas to sync this run'),
+    delay: float = typer.Option(30.0, '--delay', help='Seconds between manga scrapes'),
+) -> None:
+    """Sync queued mangas (metadata + chapter list) with rate limiting."""
+    runner = PipelineRunner(delay_seconds=delay)
+    stats = asyncio.run(runner.sync_mangas(limit=limit))
+    typer.echo(json.dumps(stats, indent=2))
+
+
+@pipeline_app.command('status')
+def pipeline_status() -> None:
+    """Show queue and daily processing stats."""
+    runner = PipelineRunner()
+    typer.echo(json.dumps(runner.status(), indent=2))
 
 
 if __name__ == '__main__':
