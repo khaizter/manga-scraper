@@ -5,6 +5,10 @@ import sys
 
 import typer
 
+from app.core.env import load_env
+
+load_env()
+
 from app.core.config import BASE_URL, LIST_URL
 from app.pipeline.runner import PipelineRunner
 from app.services.manga import get_manga

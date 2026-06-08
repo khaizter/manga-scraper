@@ -1,5 +1,9 @@
 from typing import Any
 
+from app.core.env import load_env
+
+load_env()
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydoll.exceptions import FailedToStartBrowser, WaitElementTimeout

@@ -9,7 +9,7 @@ from app.pipeline.config import (
 from app.pipeline.models import JobStatus, JobType, QueueStatus, resolve_job_status, utcnow
 from app.pipeline.state import PipelineState
 from app.pipeline.steps import build_chapter_documents, discover_mangas_from_pages, sync_mangas_from_slugs
-from app.pipeline.store import JsonFileStore, MangaStore
+from app.pipeline.store import MangaStore, get_manga_store
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class PipelineRunner:
         delay_seconds: float = PIPELINE_DELAY_SECONDS,
     ) -> None:
         self.state = state or PipelineState()
-        self.store = store or JsonFileStore()
+        self.store = store or get_manga_store()
         self.daily_limit = daily_limit
         self.delay_seconds = delay_seconds
 

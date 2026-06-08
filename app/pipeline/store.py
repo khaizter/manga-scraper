@@ -1,9 +1,15 @@
+import asyncio
 import json
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from app.core.firebase import get_firestore_client
 from app.pipeline.config import PIPELINE_STATE_DIR
-from app.pipeline.models import ChapterDocument, MangaDocument, ScrapeStatus, utcnow
+from app.pipeline.models import ChapterDocument, MangaDocument, utcnow
+
+MANGAS_COLLECTION = 'mangas'
+CHAPTERS_SUBCOLLECTION = 'chapters'
 
 
 class MangaStore(ABC):
@@ -62,28 +68,40 @@ class JsonFileStore(MangaStore):
 
 
 class FirestoreStore(MangaStore):
-    """
-    Stub for Cloud Functions integration.
+    """Firestore-backed store for pipeline sync."""
 
-    Wire this up with firebase-admin in your Cloud Function:
-      - mangas/{slug}
-      - mangas/{slug}/chapters/{chapterNumber}
-      - mangas/{slug}/chapters/{chapterNumber}/pages/{pageIndex}
-    """
+    def __init__(self) -> None:
+        self._db = get_firestore_client()
 
-    def __init__(self, project_id: str | None = None) -> None:
-        self.project_id = project_id
+    def _upsert_manga_sync(self, manga: MangaDocument) -> None:
+        manga.updated_at = utcnow()
+        payload = manga.model_dump(mode='json')
+        self._db.collection(MANGAS_COLLECTION).document(manga.slug).set(payload, merge=True)
+
+    def _upsert_chapter_sync(self, manga_slug: str, chapter: ChapterDocument) -> None:
+        payload = chapter.model_dump(mode='json')
+        self._db.collection(MANGAS_COLLECTION).document(manga_slug).collection(
+            CHAPTERS_SUBCOLLECTION,
+        ).document(chapter.chapter_number).set(payload, merge=True)
+
+    def _get_manga_sync(self, slug: str) -> MangaDocument | None:
+        snapshot = self._db.collection(MANGAS_COLLECTION).document(slug).get()
+        if not snapshot.exists:
+            return None
+        return MangaDocument.model_validate(snapshot.to_dict())
 
     async def upsert_manga(self, manga: MangaDocument) -> None:
-        raise NotImplementedError(
-            'Implement with firebase-admin: db.collection("mangas").document(slug).set(...)'
-        )
+        await asyncio.to_thread(self._upsert_manga_sync, manga)
 
     async def upsert_chapter(self, manga_slug: str, chapter: ChapterDocument) -> None:
-        raise NotImplementedError(
-            'Implement with firebase-admin: db.collection("mangas").document(slug)'
-            '.collection("chapters").document(chapterNumber).set(...)'
-        )
+        await asyncio.to_thread(self._upsert_chapter_sync, manga_slug, chapter)
 
     async def get_manga(self, slug: str) -> MangaDocument | None:
-        raise NotImplementedError('Implement with firebase-admin get()')
+        return await asyncio.to_thread(self._get_manga_sync, slug)
+
+
+def get_manga_store() -> MangaStore:
+    store_type = os.getenv('PIPELINE_STORE', 'json').lower()
+    if store_type == 'firestore':
+        return FirestoreStore()
+    return JsonFileStore()
