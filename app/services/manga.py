@@ -9,8 +9,10 @@ from pydoll.extractor import ExtractionModel, Field
 
 from app.core.browser import get_chrome_options, navigate_to, start_tab
 from app.core.config import BASE_URL, SCRAPE_TIMEOUT
+from app.pipeline.config import PIPELINE_STORE
 from app.pipeline.models import MangaDocument, SyncMangaResult, SyncMangasResult
 from app.services.chapters_api import fetch_chapter_numbers
+from app.services.storage import upload_manga_cover
 from app.utils.image import fetch_image_data_uri_from_element
 
 logger = logging.getLogger(__name__)
@@ -80,10 +82,20 @@ async def sync_manga_on_tab(tab: Tab, slug: str) -> MangaDocument:
         scrape_manga_detail_on_tab(tab, slug),
         fetch_chapter_numbers(slug),
     )
+
+    cover_storage_path: str | None = None
+    image_data_uri = detail.get('imageDataUri') or ''
+    if image_data_uri and PIPELINE_STORE == 'firestore':
+        try:
+            cover_storage_path = await upload_manga_cover(slug, image_data_uri)
+        except Exception as exc:
+            logger.warning('Failed to upload cover for %s: %s', slug, exc)
+
     return MangaDocument.from_scrape(
         slug=slug,
         data={**detail, 'chapters': chapters},
         source_url=f'{BASE_URL}/manga/{slug}',
+        cover_storage_path=cover_storage_path,
     )
 
 

@@ -25,15 +25,9 @@ Collections:
   mangas/{slug}/chapters/{chapterNumber}
     chapterNumber: str             # e.g. "336-1" (doc id)
     chapterSlug: str               # e.g. "chapter-336-1" (for scraping)
-    pageCount: int
+    storagePaths: str[]            # ordered Firebase Storage paths; page count = len(storagePaths)
     scrapeStatus: str              # pending | synced | failed
     lastSyncedAt: timestamp | null
-
-  mangas/{slug}/chapters/{chapterNumber}/pages/{pageIndex}
-    pageIndex: int                 # 0-based doc id
-    storagePath: str               # Firebase Storage path to image
-    sourceUrl: str | null          # original CDN url (optional)
-    lastSyncedAt: timestamp
 
   pipeline_jobs/{jobId}
     type: str                      # discover | sync_manga | sync_chapter
@@ -162,7 +156,14 @@ class MangaDocument(BaseModel):
         )
 
     @classmethod
-    def from_scrape(cls, slug: str, data: dict[str, Any], source_url: str) -> 'MangaDocument':
+    def from_scrape(
+        cls,
+        slug: str,
+        data: dict[str, Any],
+        source_url: str,
+        *,
+        cover_storage_path: str | None = None,
+    ) -> 'MangaDocument':
         chapters = data.get('chapters', [])
         now = utcnow()
         return cls(
@@ -173,6 +174,7 @@ class MangaDocument(BaseModel):
             status=data['status'],
             source_url=source_url,
             chapters=chapters,
+            cover_storage_path=cover_storage_path,
             scrape_status=ScrapeStatus.SYNCED,
             last_synced_at=now,
             updated_at=now,
@@ -190,10 +192,10 @@ class ChapterDocument(BaseModel):
         alias='chapterSlug',
         validation_alias=AliasChoices('chapterSlug', 'chapter_slug'),
     )
-    page_count: int = Field(
-        default=0,
-        alias='pageCount',
-        validation_alias=AliasChoices('pageCount', 'page_count'),
+    storage_paths: list[str] = Field(
+        default_factory=list,
+        alias='storagePaths',
+        validation_alias=AliasChoices('storagePaths', 'storage_paths'),
     )
     scrape_status: ScrapeStatus = Field(
         default=ScrapeStatus.PENDING,
