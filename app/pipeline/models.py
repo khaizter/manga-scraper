@@ -6,15 +6,19 @@ Collections:
 
   mangas/{slug}
     slug: str
-    title: str
+    title: str | null              # null until first sync
     description: str | null
-    author: str
-    status: str                    # e.g. "Ongoing", "Completed"
-    sourceUrl: str
-    chapterCount: int
+    author: str | null
+    status: str | null             # e.g. "Ongoing", "Completed"
+    sourceUrl: str | null
+    chapters: str[]                # chapter count = len(chapters)
     coverStoragePath: str | null   # Firebase Storage path, NOT base64
-    scrapeStatus: str              # pending | synced | failed
-    lastSyncedAt: timestamp
+    scrapeStatus: str              # pending | processing | synced | failed
+    discoveredAt: timestamp
+    attempts: int
+    lastAttemptAt: timestamp | null
+    lastError: str | null
+    lastSyncedAt: timestamp | null
     createdAt: timestamp
     updatedAt: timestamp
 
@@ -39,39 +43,24 @@ Collections:
     config: map
     stats: map                     # processed, failed, skipped
 
-  pipeline_queue/{slug}
-    slug: str                      # doc id
-    status: str                    # pending | processing | completed | failed
-    priority: int                  # lower = sooner
-    discoveredAt: timestamp
-    attempts: int
-    lastAttemptAt: timestamp | null
-    lastError: str | null
-
 Notes:
   - Never store imageDataUri or page base64 in Firestore (1MB doc limit).
   - Upload images to Firebase Storage; store paths/URLs only.
-  - Use pipeline_queue for scheduled Cloud Function work distribution.
-  - Cloud Function can read queue, process N items, update docs, respect daily caps.
+  - Discover creates pending manga stubs; sync enriches the same document.
+  - Filter scrapeStatus != synced in app-facing reads.
 """
 
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class ScrapeStatus(StrEnum):
     PENDING = 'pending'
-    SYNCED = 'synced'
-    FAILED = 'failed'
-
-
-class QueueStatus(StrEnum):
-    PENDING = 'pending'
     PROCESSING = 'processing'
-    COMPLETED = 'completed'
+    SYNCED = 'synced'
     FAILED = 'failed'
 
 
@@ -100,34 +89,82 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class QueueItem(BaseModel):
-    slug: str
-    status: QueueStatus = QueueStatus.PENDING
-    priority: int = 0
-    discovered_at: datetime = Field(default_factory=utcnow)
-    attempts: int = 0
-    last_attempt_at: datetime | None = None
-    last_error: str | None = None
-
-
 class MangaDocument(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
     slug: str
-    title: str
+    title: str | None = None
     description: str | None = None
-    author: str
-    status: str
-    source_url: str
-    chapter_numbers: list[str] = Field(default_factory=list)
-    chapter_count: int = 0
-    cover_storage_path: str | None = None
-    scrape_status: ScrapeStatus = ScrapeStatus.SYNCED
-    last_synced_at: datetime = Field(default_factory=utcnow)
-    created_at: datetime = Field(default_factory=utcnow)
-    updated_at: datetime = Field(default_factory=utcnow)
+    author: str | None = None
+    status: str | None = None
+    source_url: str | None = Field(
+        default=None,
+        alias='sourceUrl',
+        validation_alias=AliasChoices('sourceUrl', 'source_url'),
+    )
+    chapters: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices('chapters', 'chapterNumbers', 'chapter_numbers'),
+    )
+    cover_storage_path: str | None = Field(
+        default=None,
+        alias='coverStoragePath',
+        validation_alias=AliasChoices('coverStoragePath', 'cover_storage_path'),
+    )
+    scrape_status: ScrapeStatus = Field(
+        default=ScrapeStatus.PENDING,
+        alias='scrapeStatus',
+        validation_alias=AliasChoices('scrapeStatus', 'scrape_status'),
+    )
+    discovered_at: datetime = Field(
+        default_factory=utcnow,
+        alias='discoveredAt',
+        validation_alias=AliasChoices('discoveredAt', 'discovered_at'),
+    )
+    attempts: int = 0
+    last_attempt_at: datetime | None = Field(
+        default=None,
+        alias='lastAttemptAt',
+        validation_alias=AliasChoices('lastAttemptAt', 'last_attempt_at'),
+    )
+    last_error: str | None = Field(
+        default=None,
+        alias='lastError',
+        validation_alias=AliasChoices('lastError', 'last_error'),
+    )
+    last_synced_at: datetime | None = Field(
+        default=None,
+        alias='lastSyncedAt',
+        validation_alias=AliasChoices('lastSyncedAt', 'last_synced_at'),
+    )
+    created_at: datetime = Field(
+        default_factory=utcnow,
+        alias='createdAt',
+        validation_alias=AliasChoices('createdAt', 'created_at'),
+    )
+    updated_at: datetime = Field(
+        default_factory=utcnow,
+        alias='updatedAt',
+        validation_alias=AliasChoices('updatedAt', 'updated_at'),
+    )
+
+    @classmethod
+    def pending_stub(cls, slug: str) -> 'MangaDocument':
+        now = utcnow()
+        return cls(
+            slug=slug,
+            scrape_status=ScrapeStatus.PENDING,
+            discovered_at=now,
+            created_at=now,
+            attempts=0,
+            last_error=None,
+            updated_at=now,
+        )
 
     @classmethod
     def from_scrape(cls, slug: str, data: dict[str, Any], source_url: str) -> 'MangaDocument':
         chapters = data.get('chapters', [])
+        now = utcnow()
         return cls(
             slug=slug,
             title=data['title'],
@@ -135,17 +172,39 @@ class MangaDocument(BaseModel):
             author=data['author'],
             status=data['status'],
             source_url=source_url,
-            chapter_numbers=chapters,
-            chapter_count=len(chapters),
+            chapters=chapters,
+            scrape_status=ScrapeStatus.SYNCED,
+            last_synced_at=now,
+            updated_at=now,
         )
 
 
 class ChapterDocument(BaseModel):
-    chapter_number: str
-    chapter_slug: str
-    page_count: int = 0
-    scrape_status: ScrapeStatus = ScrapeStatus.PENDING
-    last_synced_at: datetime | None = None
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    chapter_number: str = Field(
+        alias='chapterNumber',
+        validation_alias=AliasChoices('chapterNumber', 'chapter_number'),
+    )
+    chapter_slug: str = Field(
+        alias='chapterSlug',
+        validation_alias=AliasChoices('chapterSlug', 'chapter_slug'),
+    )
+    page_count: int = Field(
+        default=0,
+        alias='pageCount',
+        validation_alias=AliasChoices('pageCount', 'page_count'),
+    )
+    scrape_status: ScrapeStatus = Field(
+        default=ScrapeStatus.PENDING,
+        alias='scrapeStatus',
+        validation_alias=AliasChoices('scrapeStatus', 'scrape_status'),
+    )
+    last_synced_at: datetime | None = Field(
+        default=None,
+        alias='lastSyncedAt',
+        validation_alias=AliasChoices('lastSyncedAt', 'last_synced_at'),
+    )
 
 
 class PageDiscoverResult(BaseModel):

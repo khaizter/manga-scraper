@@ -26,12 +26,12 @@ async def sync_mangas_from_slugs(
     return await sync_mangas_in_session(slugs, delay_seconds=delay_seconds)
 
 
-def build_chapter_documents(chapter_numbers: list[str]) -> list[ChapterDocument]:
+def build_chapter_documents(chapters: list[str]) -> list[ChapterDocument]:
     return [
         ChapterDocument(
             chapter_number=number,
             chapter_slug=f'{CHAPTER_SLUG_PREFIX}{number}',
             scrape_status=ScrapeStatus.PENDING,
         )
-        for number in chapter_numbers
+        for number in chapters
     ]

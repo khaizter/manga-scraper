@@ -102,7 +102,7 @@ async def sync_mangas_in_session(
             try:
                 manga = await sync_manga_on_tab(tab, slug)
                 results.append(SyncMangaResult(slug=slug, manga=manga, success=True))
-                logger.info('Synced manga: %s (%d chapters)', slug, manga.chapter_count)
+                logger.info('Synced manga: %s (%d chapters)', slug, len(manga.chapters))
             except Exception as exc:
                 error = str(exc)
                 results.append(

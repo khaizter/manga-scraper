@@ -83,7 +83,7 @@ def pipeline_discover(
     page_count: int = typer.Option(1, '--page-count', '-n', help='Number of listing pages to scan'),
     delay: float = typer.Option(2.0, '--delay', help='Seconds between page navigations'),
 ) -> None:
-    """Discover manga slugs from listing pages and enqueue them."""
+    """Discover manga slugs from listing pages and create pending manga stubs."""
     runner = PipelineRunner()
     stats = asyncio.run(
         runner.discover(
@@ -100,7 +100,7 @@ def pipeline_sync(
     limit: int = typer.Option(10, '--limit', '-n', help='Max mangas to sync this run'),
     delay: float = typer.Option(30.0, '--delay', help='Seconds between manga scrapes'),
 ) -> None:
-    """Sync queued mangas (metadata + chapter list) with rate limiting."""
+    """Sync pending mangas (metadata + chapter list) with rate limiting."""
     runner = PipelineRunner(delay_seconds=delay)
     stats = asyncio.run(runner.sync_mangas(limit=limit))
     typer.echo(json.dumps(stats, indent=2))
@@ -108,9 +108,40 @@ def pipeline_sync(
 
 @pipeline_app.command('status')
 def pipeline_status() -> None:
-    """Show queue and daily processing stats."""
+    """Show manga scrape status counts and daily processing stats."""
     runner = PipelineRunner()
-    typer.echo(json.dumps(runner.status(), indent=2))
+    typer.echo(json.dumps(asyncio.run(runner.status()), indent=2, default=str))
+
+
+@pipeline_app.command('migrate-queue')
+def pipeline_migrate_queue() -> None:
+    """Copy local queue.json items into mangas as pending stubs."""
+    from app.pipeline.config import PIPELINE_STATE_DIR
+    from app.pipeline.store import get_manga_store
+
+    queue_path = PIPELINE_STATE_DIR / 'queue.json'
+    if not queue_path.exists():
+        typer.echo('No local queue.json found.')
+        raise typer.Exit(code=1)
+
+    raw = json.loads(queue_path.read_text(encoding='utf-8'))
+    items = raw.get('items', {})
+    if not items:
+        typer.echo('No items in local queue.json to migrate.')
+        raise typer.Exit(code=1)
+
+    slugs = [
+        slug
+        for slug, item in items.items()
+        if item.get('status') != 'completed'
+    ]
+    if not slugs:
+        typer.echo('All queue items are already completed; nothing to migrate.')
+        raise typer.Exit(code=1)
+
+    store = get_manga_store()
+    migrated = asyncio.run(store.enqueue_slugs(slugs))
+    typer.echo(f'Migrated {migrated} manga stub(s) from queue.json into mangas collection.')
 
 
 if __name__ == '__main__':

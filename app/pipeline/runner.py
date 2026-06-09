@@ -1,15 +1,20 @@
+import asyncio
 import logging
 
+from pydoll.browser.chromium import Chrome
+
+from app.core.browser import get_chrome_options, start_tab
 from app.pipeline.config import (
     PIPELINE_DAILY_LIMIT,
     PIPELINE_DELAY_SECONDS,
     PIPELINE_DISCOVER_DELAY_SECONDS,
     PIPELINE_MAX_RETRIES,
 )
-from app.pipeline.models import JobStatus, JobType, QueueStatus, resolve_job_status, utcnow
+from app.pipeline.models import JobStatus, JobType, ScrapeStatus, resolve_job_status, utcnow
 from app.pipeline.state import PipelineState
-from app.pipeline.steps import build_chapter_documents, discover_mangas_from_pages, sync_mangas_from_slugs
+from app.pipeline.steps import build_chapter_documents, discover_mangas_from_pages
 from app.pipeline.store import MangaStore, get_manga_store
+from app.services.manga import sync_manga_on_tab
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +27,8 @@ class PipelineRunner:
         daily_limit: int = PIPELINE_DAILY_LIMIT,
         delay_seconds: float = PIPELINE_DELAY_SECONDS,
     ) -> None:
-        self.state = state or PipelineState()
         self.store = store or get_manga_store()
+        self.state = state or PipelineState(manga_store=self.store)
         self.daily_limit = daily_limit
         self.delay_seconds = delay_seconds
 
@@ -68,7 +73,7 @@ class PipelineRunner:
 
             for page_result in result.page_results:
                 if page_result.success:
-                    enqueued = self.state.enqueue_slugs(page_result.slugs)
+                    enqueued = await self.store.enqueue_slugs(page_result.slugs)
                     stats['discovered'] += len(page_result.slugs)
                     stats['enqueued'] += enqueued
                     stats['pagesSucceeded'] += 1
@@ -91,6 +96,13 @@ class PipelineRunner:
             self.state.update_job(job, JobStatus.FAILED, stats)
             raise
 
+    async def _reset_stuck_processing(self, slugs: list[str]) -> None:
+        for slug in slugs:
+            manga = await self.store.get_manga(slug)
+            if manga and manga.scrape_status == ScrapeStatus.PROCESSING:
+                manga.scrape_status = ScrapeStatus.PENDING
+                await self.store.upsert_manga(manga)
+
     async def sync_mangas(self, limit: int | None = None) -> dict:
         remaining_today = max(0, self.daily_limit - self.state.get_daily_processed_count())
         if remaining_today == 0:
@@ -102,58 +114,65 @@ class PipelineRunner:
             }
 
         batch_size = min(limit or remaining_today, remaining_today)
-        pending = self.state.get_pending_slugs(batch_size)
+        pending = await self.store.get_pending_mangas(batch_size)
+
+        if not pending:
+            return {'processed': 0, 'failed': 0, 'skipped': 0, 'message': 'No pending mangas'}
+
+        batch_slugs = [manga.slug for manga in pending]
 
         job = self.state.start_job(
             JobType.SYNC_MANGA,
             {'limit': batch_size, 'dailyLimit': self.daily_limit},
         )
         stats: dict = {'processed': 0, 'failed': 0, 'skipped': 0, 'failedSlugs': []}
-        slug_to_item = {item.slug: item for item in pending}
-
-        for item in pending:
-            item.status = QueueStatus.PROCESSING
-            item.last_attempt_at = utcnow()
-            self.state.update_queue_item(item)
 
         try:
-            sync_result = await sync_mangas_from_slugs(
-                [item.slug for item in pending],
-                delay_seconds=self.delay_seconds,
-            )
+            options = get_chrome_options()
+            async with Chrome(options=options) as browser:
+                tab = await start_tab(browser)
+                for index, existing in enumerate(pending):
+                    existing.scrape_status = ScrapeStatus.PROCESSING
+                    existing.last_attempt_at = utcnow()
+                    await self.store.upsert_manga(existing)
 
-            for result in sync_result.results:
-                item = slug_to_item[result.slug]
+                    try:
+                        scraped = await sync_manga_on_tab(tab, existing.slug)
+                        manga = scraped
+                        manga.created_at = existing.created_at
+                        manga.discovered_at = existing.discovered_at
+                        manga.attempts = 0
+                        manga.last_error = None
+                        await self.store.upsert_manga(manga)
+                        for chapter in build_chapter_documents(manga.chapters):
+                            await self.store.upsert_chapter(existing.slug, chapter)
 
-                if result.success and result.manga:
-                    await self.store.upsert_manga(result.manga)
-                    for chapter in build_chapter_documents(result.manga.chapter_numbers):
-                        await self.store.upsert_chapter(result.slug, chapter)
+                        stats['processed'] += 1
+                        self.state.increment_daily_processed()
+                        logger.info('Synced manga: %s (%d chapters)', existing.slug, len(manga.chapters))
+                    except Exception as exc:
+                        error = str(exc)
+                        existing.attempts += 1
+                        existing.last_error = error
+                        existing.scrape_status = (
+                            ScrapeStatus.FAILED
+                            if existing.attempts >= PIPELINE_MAX_RETRIES
+                            else ScrapeStatus.PENDING
+                        )
+                        await self.store.upsert_manga(existing)
+                        stats['failed'] += 1
+                        stats['failedSlugs'].append({
+                            'slug': existing.slug,
+                            'error': error,
+                        })
+                        logger.error('Failed to sync manga %s: %s', existing.slug, error, exc_info=True)
 
-                    item.status = QueueStatus.COMPLETED
-                    item.last_error = None
-                    stats['processed'] += 1
-                    self.state.increment_daily_processed()
-                else:
-                    item.attempts += 1
-                    item.last_error = result.error
-                    item.status = (
-                        QueueStatus.FAILED
-                        if item.attempts >= PIPELINE_MAX_RETRIES
-                        else QueueStatus.PENDING
-                    )
-                    stats['failed'] += 1
-                    stats['failedSlugs'].append({
-                        'slug': result.slug,
-                        'error': result.error,
-                    })
-
-                self.state.update_queue_item(item)
+                    if index < len(pending) - 1:
+                        await asyncio.sleep(self.delay_seconds)
         except Exception:
-            for item in pending:
-                if item.status == QueueStatus.PROCESSING:
-                    item.status = QueueStatus.PENDING
-                    self.state.update_queue_item(item)
+            await self._reset_stuck_processing(batch_slugs)
+            stats['status'] = JobStatus.FAILED.value
+            self.state.update_job(job, JobStatus.FAILED, stats)
             raise
 
         job_status = resolve_job_status(stats['processed'], stats['failed'])
@@ -161,5 +180,5 @@ class PipelineRunner:
         self.state.update_job(job, job_status, stats)
         return stats
 
-    def status(self) -> dict:
-        return self.state.get_status_summary()
+    async def status(self) -> dict:
+        return await self.state.get_status_summary()
