@@ -15,6 +15,7 @@ from app.pipeline.state import PipelineState
 from app.pipeline.steps import build_chapter_documents, discover_mangas_from_pages
 from app.pipeline.store import MangaStore, get_manga_store
 from app.services.manga import sync_manga_on_tab
+from app.services.manga_chapter import sync_chapter_on_tab
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,84 @@ class PipelineRunner:
                         await asyncio.sleep(self.delay_seconds)
         except Exception:
             await self._reset_stuck_processing(batch_slugs)
+            stats['status'] = JobStatus.FAILED.value
+            self.state.update_job(job, JobStatus.FAILED, stats)
+            raise
+
+        job_status = resolve_job_status(stats['processed'], stats['failed'])
+        stats['status'] = job_status.value
+        self.state.update_job(job, job_status, stats)
+        return stats
+
+    async def sync_chapters(self, limit: int | None = None) -> dict:
+        remaining_today = max(0, self.daily_limit - self.state.get_daily_processed_count())
+        if remaining_today == 0:
+            return {
+                'processed': 0,
+                'failed': 0,
+                'skipped': 0,
+                'message': f'Daily limit of {self.daily_limit} reached',
+            }
+
+        batch_size = min(limit or remaining_today, remaining_today)
+        pending = await self.store.get_pending_chapters(batch_size)
+
+        if not pending:
+            return {
+                'processed': 0,
+                'failed': 0,
+                'skipped': 0,
+                'message': 'No pending chapters',
+            }
+
+        job = self.state.start_job(
+            JobType.SYNC_CHAPTER,
+            {'limit': batch_size, 'dailyLimit': self.daily_limit},
+        )
+        stats: dict = {'processed': 0, 'failed': 0, 'skipped': 0, 'failedChapters': []}
+
+        try:
+            options = get_chrome_options()
+            async with Chrome(options=options) as browser:
+                tab = await start_tab(browser)
+                for index, item in enumerate(pending):
+                    try:
+                        synced_chapter = await sync_chapter_on_tab(
+                            tab,
+                            item.manga_slug,
+                            item.chapter,
+                        )
+                        await self.store.upsert_chapter(item.manga_slug, synced_chapter)
+                        stats['processed'] += 1
+                        self.state.increment_daily_processed()
+                        logger.info(
+                            'Synced chapter: %s/%s (%d pages)',
+                            item.manga_slug,
+                            item.chapter.chapter_number,
+                            len(synced_chapter.storage_paths),
+                        )
+                    except Exception as exc:
+                        error = str(exc)
+                        failed_chapter = item.chapter
+                        failed_chapter.scrape_status = ScrapeStatus.FAILED
+                        await self.store.upsert_chapter(item.manga_slug, failed_chapter)
+                        stats['failed'] += 1
+                        stats['failedChapters'].append({
+                            'mangaSlug': item.manga_slug,
+                            'chapterNumber': item.chapter.chapter_number,
+                            'error': error,
+                        })
+                        logger.error(
+                            'Failed to sync chapter %s/%s: %s',
+                            item.manga_slug,
+                            item.chapter.chapter_number,
+                            error,
+                            exc_info=True,
+                        )
+
+                    if index < len(pending) - 1:
+                        await asyncio.sleep(self.delay_seconds)
+        except Exception:
             stats['status'] = JobStatus.FAILED.value
             self.state.update_job(job, JobStatus.FAILED, stats)
             raise

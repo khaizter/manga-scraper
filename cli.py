@@ -106,6 +106,17 @@ def pipeline_sync(
     typer.echo(json.dumps(stats, indent=2))
 
 
+@pipeline_app.command('sync-chapters')
+def pipeline_sync_chapters(
+    limit: int = typer.Option(10, '--limit', '-n', help='Max chapters to sync this run'),
+    delay: float = typer.Option(30.0, '--delay', help='Seconds between chapter scrapes'),
+) -> None:
+    """Sync chapter page images for synced mangas with pending chapter uploads."""
+    runner = PipelineRunner(delay_seconds=delay)
+    stats = asyncio.run(runner.sync_chapters(limit=limit))
+    typer.echo(json.dumps(stats, indent=2, default=str))
+
+
 @pipeline_app.command('status')
 def pipeline_status() -> None:
     """Show manga scrape status counts and daily processing stats."""

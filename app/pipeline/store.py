@@ -5,8 +5,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from app.core.firebase import get_firestore_client
+from app.pipeline.chapter_selection import select_pending_chapters
 from app.pipeline.config import PIPELINE_MAX_RETRIES, PIPELINE_STATE_DIR
-from app.pipeline.models import ChapterDocument, MangaDocument, ScrapeStatus, utcnow
+from app.pipeline.models import ChapterDocument, MangaDocument, PendingChapter, ScrapeStatus, utcnow
 
 MANGAS_COLLECTION = 'mangas'
 CHAPTERS_SUBCOLLECTION = 'chapters'
@@ -40,6 +41,14 @@ class MangaStore(ABC):
 
     @abstractmethod
     async def count_scrape_status(self) -> dict[str, int]:
+        pass
+
+    @abstractmethod
+    async def get_pending_chapters(self, limit: int) -> list[PendingChapter]:
+        pass
+
+    @abstractmethod
+    async def count_pending_chapters(self) -> int:
         pass
 
 
@@ -130,6 +139,35 @@ class JsonFileStore(MangaStore):
             counts[manga.scrape_status.value] += 1
         return counts
 
+    def _load_chapters(self, manga_slug: str) -> dict[str, ChapterDocument]:
+        path = self._chapters_path(manga_slug)
+        if not path.exists():
+            return {}
+        raw = json.loads(path.read_text(encoding='utf-8'))
+        return {
+            chapter_number: ChapterDocument.model_validate(chapter_data)
+            for chapter_number, chapter_data in raw.items()
+        }
+
+    async def _list_synced_mangas(self) -> list[MangaDocument]:
+        synced: list[MangaDocument] = []
+        for slug in self._list_manga_slugs():
+            manga = await self.get_manga(slug)
+            if manga and manga.scrape_status == ScrapeStatus.SYNCED:
+                synced.append(manga)
+        return synced
+
+    async def get_pending_chapters(self, limit: int) -> list[PendingChapter]:
+        synced_mangas = await self._list_synced_mangas()
+        chapters_by_manga = {
+            manga.slug: self._load_chapters(manga.slug)
+            for manga in synced_mangas
+        }
+        return select_pending_chapters(synced_mangas, chapters_by_manga, limit)
+
+    async def count_pending_chapters(self) -> int:
+        return len(await self.get_pending_chapters(limit=10**9))
+
 
 class FirestoreStore(MangaStore):
     """Firestore-backed store for pipeline discover and sync."""
@@ -199,6 +237,35 @@ class FirestoreStore(MangaStore):
             counts[status] = counts.get(status, 0) + 1
         return counts
 
+    def _load_chapters_sync(self, manga_slug: str) -> dict[str, ChapterDocument]:
+        chapters: dict[str, ChapterDocument] = {}
+        for snapshot in self._collection.document(manga_slug).collection(
+            CHAPTERS_SUBCOLLECTION,
+        ).stream():
+            if not snapshot.exists:
+                continue
+            chapters[snapshot.id] = ChapterDocument.model_validate(
+                {**snapshot.to_dict(), 'chapter_number': snapshot.id},
+            )
+        return chapters
+
+    def _list_synced_mangas_sync(self) -> list[MangaDocument]:
+        synced: list[MangaDocument] = []
+        query = self._collection.where('scrapeStatus', '==', ScrapeStatus.SYNCED.value)
+        for snapshot in query.stream():
+            synced.append(
+                MangaDocument.model_validate({**snapshot.to_dict(), 'slug': snapshot.id}),
+            )
+        return synced
+
+    def _get_pending_chapters_sync(self, limit: int) -> list[PendingChapter]:
+        synced_mangas = self._list_synced_mangas_sync()
+        chapters_by_manga = {
+            manga.slug: self._load_chapters_sync(manga.slug)
+            for manga in synced_mangas
+        }
+        return select_pending_chapters(synced_mangas, chapters_by_manga, limit)
+
     async def upsert_manga(self, manga: MangaDocument) -> None:
         await asyncio.to_thread(self._upsert_manga_sync, manga)
 
@@ -216,6 +283,13 @@ class FirestoreStore(MangaStore):
 
     async def count_scrape_status(self) -> dict[str, int]:
         return await asyncio.to_thread(self._count_scrape_status_sync)
+
+    async def get_pending_chapters(self, limit: int) -> list[PendingChapter]:
+        return await asyncio.to_thread(self._get_pending_chapters_sync, limit)
+
+    async def count_pending_chapters(self) -> int:
+        pending = await self.get_pending_chapters(limit=10**9)
+        return len(pending)
 
 
 def get_manga_store() -> MangaStore:

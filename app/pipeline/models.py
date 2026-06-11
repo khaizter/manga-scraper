@@ -60,6 +60,14 @@ Notes:
   - Upload images to Firebase Storage; store paths/URLs only.
   - Discover creates pending manga stubs; sync enriches the same document.
   - Filter scrapeStatus != synced in app-facing reads.
+
+Chapter pipeline selection (sync_chapter)
+=======================================
+  1. Manga scrapeStatus == synced
+  2. For each chapterNumber in manga.chapters (in order):
+       - chapters/{chapterNumber} missing → treat as pending stub
+       - chapters/{chapterNumber}.scrapeStatus != synced → eligible
+  3. Oldest manga.discoveredAt first; within a manga, follow chapters[] order
 """
 
 from datetime import datetime, timezone
@@ -245,6 +253,16 @@ class ChapterDocument(BaseModel):
         alias='lastSyncedAt',
         validation_alias=AliasChoices('lastSyncedAt', 'last_synced_at'),
     )
+
+
+def chapter_needs_sync(chapter: ChapterDocument) -> bool:
+    """True when chapter page images still need to be uploaded."""
+    return chapter.scrape_status != ScrapeStatus.SYNCED
+
+
+class PendingChapter(BaseModel):
+    manga_slug: str
+    chapter: ChapterDocument
 
 
 class PageDiscoverResult(BaseModel):

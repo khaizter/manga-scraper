@@ -4,7 +4,7 @@ import logging
 import re
 
 from app.core.firebase import get_storage_bucket
-from app.pipeline.models import manga_cover_storage_path
+from app.pipeline.models import chapter_page_storage_path, manga_cover_storage_path
 
 logger = logging.getLogger(__name__)
 
@@ -42,3 +42,26 @@ async def upload_manga_cover(slug: str, data_uri: str) -> str:
     await asyncio.to_thread(_upload_bytes_sync, storage_path, data, mime)
     logger.info('Uploaded cover for %s to %s', slug, storage_path)
     return storage_path
+
+
+async def upload_chapter_pages(
+    manga_slug: str,
+    chapter_number: str,
+    page_data_uris: list[str],
+) -> list[str]:
+    """Upload chapter page images and return ordered Storage object paths."""
+    storage_paths: list[str] = []
+    for page_index, data_uri in enumerate(page_data_uris):
+        mime, data = parse_data_uri(data_uri)
+        extension = MIME_EXTENSIONS.get(mime, 'jpg')
+        storage_path = chapter_page_storage_path(manga_slug, chapter_number, page_index, extension)
+        await asyncio.to_thread(_upload_bytes_sync, storage_path, data, mime)
+        storage_paths.append(storage_path)
+
+    logger.info(
+        'Uploaded %d page(s) for %s chapter %s',
+        len(storage_paths),
+        manga_slug,
+        chapter_number,
+    )
+    return storage_paths
