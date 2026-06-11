@@ -37,6 +37,24 @@ Collections:
     config: map
     stats: map                     # processed, failed, skipped
 
+Firebase Storage layout (default bucket: {projectId}.firebasestorage.app)
+=========================================================================
+
+All paths are lowercase, kebab-case slugs, relative to the bucket root.
+Firestore stores the path string only — never image bytes or data URIs.
+
+  mangas/{slug}/cover.{ext}
+    Manga cover image (sync_manga).
+    Referenced by mangas/{slug}.coverStoragePath.
+    ext: jpg | png | webp | gif (from source mime type).
+
+  mangas/{slug}/chapters/{chapterNumber}/{pageIndex}.{ext}
+    Chapter page images (sync_chapter), 0-based pageIndex.
+    Ordered paths collected into chapters/{chapterNumber}.storagePaths.
+    Example:
+      mangas/black-clover/chapters/336-1/0.webp
+      mangas/black-clover/chapters/336-1/1.webp
+
 Notes:
   - Never store imageDataUri or page base64 in Firestore (1MB doc limit).
   - Upload images to Firebase Storage; store paths/URLs only.
@@ -81,6 +99,26 @@ def resolve_job_status(succeeded: int, failed: int) -> JobStatus:
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+STORAGE_MANGAS_PREFIX = 'mangas'
+
+
+def manga_cover_storage_path(slug: str, extension: str) -> str:
+    """Storage path for a manga cover (sync_manga)."""
+    return f'{STORAGE_MANGAS_PREFIX}/{slug}/cover.{extension}'
+
+
+def chapter_page_storage_path(
+    slug: str,
+    chapter_number: str,
+    page_index: int,
+    extension: str,
+) -> str:
+    """Storage path for a single chapter page (sync_chapter). page_index is 0-based."""
+    return (
+        f'{STORAGE_MANGAS_PREFIX}/{slug}/chapters/{chapter_number}/{page_index}.{extension}'
+    )
 
 
 class MangaDocument(BaseModel):

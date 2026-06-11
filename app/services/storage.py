@@ -4,6 +4,7 @@ import logging
 import re
 
 from app.core.firebase import get_storage_bucket
+from app.pipeline.models import manga_cover_storage_path
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +16,6 @@ MIME_EXTENSIONS = {
     'image/webp': 'webp',
     'image/gif': 'gif',
 }
-
-
-def manga_cover_storage_path(slug: str, extension: str) -> str:
-    return f'mangas/{slug}/cover.{extension}'
 
 
 def parse_data_uri(data_uri: str) -> tuple[str, bytes]:
