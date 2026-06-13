@@ -82,6 +82,8 @@ def pipeline_discover(
     start_page: int = typer.Option(1, '--start-page', help='First listing page to scan'),
     page_count: int = typer.Option(1, '--page-count', '-n', help='Number of listing pages to scan'),
     delay: float = typer.Option(2.0, '--delay', help='Seconds between page navigations'),
+    dry_run: bool = typer.Option(False, '--dry-run', help='Scrape pages without enqueueing manga stubs'),
+    verbose: bool = typer.Option(False, '--verbose', '-v', help='Log detailed progress'),
 ) -> None:
     """Discover manga slugs from listing pages and create pending manga stubs."""
     runner = PipelineRunner()
@@ -90,6 +92,8 @@ def pipeline_discover(
             start_page=start_page,
             page_count=page_count,
             delay_seconds=delay,
+            dry_run=dry_run,
+            verbose=verbose,
         )
     )
     typer.echo(json.dumps(stats, indent=2, default=str))
@@ -99,60 +103,37 @@ def pipeline_discover(
 def pipeline_sync(
     limit: int = typer.Option(10, '--limit', '-n', help='Max mangas to sync this run'),
     delay: float = typer.Option(30.0, '--delay', help='Seconds between manga scrapes'),
+    dry_run: bool = typer.Option(False, '--dry-run', help='Scrape mangas without writing to Firestore/Storage'),
+    verbose: bool = typer.Option(False, '--verbose', '-v', help='Log detailed progress'),
 ) -> None:
     """Sync pending mangas (metadata + chapter list) with rate limiting."""
     runner = PipelineRunner(delay_seconds=delay)
-    stats = asyncio.run(runner.sync_mangas(limit=limit))
-    typer.echo(json.dumps(stats, indent=2))
+    stats = asyncio.run(
+        runner.sync_mangas(limit=limit, dry_run=dry_run, verbose=verbose),
+    )
+    typer.echo(json.dumps(stats, indent=2, default=str))
 
 
 @pipeline_app.command('sync-chapters')
 def pipeline_sync_chapters(
     limit: int = typer.Option(10, '--limit', '-n', help='Max chapters to sync this run'),
     delay: float = typer.Option(30.0, '--delay', help='Seconds between chapter scrapes'),
+    dry_run: bool = typer.Option(False, '--dry-run', help='Scrape chapters without uploading pages'),
+    verbose: bool = typer.Option(False, '--verbose', '-v', help='Log detailed progress'),
 ) -> None:
     """Sync chapter page images for synced mangas with pending chapter uploads."""
     runner = PipelineRunner(delay_seconds=delay)
-    stats = asyncio.run(runner.sync_chapters(limit=limit))
+    stats = asyncio.run(
+        runner.sync_chapters(limit=limit, dry_run=dry_run, verbose=verbose),
+    )
     typer.echo(json.dumps(stats, indent=2, default=str))
 
 
 @pipeline_app.command('status')
 def pipeline_status() -> None:
-    """Show manga scrape status counts and daily processing stats."""
+    """Show manga and chapter scrape status counts."""
     runner = PipelineRunner()
     typer.echo(json.dumps(asyncio.run(runner.status()), indent=2, default=str))
-
-
-@pipeline_app.command('migrate-queue')
-def pipeline_migrate_queue() -> None:
-    """Copy local queue.json items into mangas as pending stubs."""
-    from app.pipeline.config import PIPELINE_STATE_DIR
-    from app.pipeline.store import get_manga_store
-
-    queue_path = PIPELINE_STATE_DIR / 'queue.json'
-    if not queue_path.exists():
-        typer.echo('No local queue.json found.')
-        raise typer.Exit(code=1)
-
-    raw = json.loads(queue_path.read_text(encoding='utf-8'))
-    items = raw.get('items', {})
-    if not items:
-        typer.echo('No items in local queue.json to migrate.')
-        raise typer.Exit(code=1)
-
-    slugs = [
-        slug
-        for slug, item in items.items()
-        if item.get('status') != 'completed'
-    ]
-    if not slugs:
-        typer.echo('All queue items are already completed; nothing to migrate.')
-        raise typer.Exit(code=1)
-
-    store = get_manga_store()
-    migrated = asyncio.run(store.enqueue_slugs(slugs))
-    typer.echo(f'Migrated {migrated} manga stub(s) from queue.json into mangas collection.')
 
 
 if __name__ == '__main__':

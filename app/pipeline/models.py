@@ -29,14 +29,6 @@ Collections:
     scrapeStatus: str              # pending | synced | failed
     lastSyncedAt: timestamp | null
 
-  pipeline_jobs/{jobId}
-    type: str                      # discover | sync_manga | sync_chapter
-    status: str                    # running | completed | failed
-    startedAt: timestamp
-    completedAt: timestamp | null
-    config: map
-    stats: map                     # processed, failed, skipped
-
 Firebase Storage layout (default bucket: {projectId}.firebasestorage.app)
 =========================================================================
 
@@ -84,14 +76,7 @@ class ScrapeStatus(StrEnum):
     FAILED = 'failed'
 
 
-class JobType(StrEnum):
-    DISCOVER = 'discover'
-    SYNC_MANGA = 'sync_manga'
-    SYNC_CHAPTER = 'sync_chapter'
-
-
 class JobStatus(StrEnum):
-    RUNNING = 'running'
     COMPLETED = 'completed'
     PARTIALLY_COMPLETED = 'partially_completed'
     FAILED = 'failed'
@@ -308,13 +293,3 @@ class SyncMangasResult(BaseModel):
     @property
     def failed(self) -> list[SyncMangaResult]:
         return [result for result in self.results if not result.success]
-
-
-class PipelineJob(BaseModel):
-    id: str
-    type: JobType
-    status: JobStatus = JobStatus.RUNNING
-    started_at: datetime = Field(default_factory=utcnow)
-    completed_at: datetime | None = None
-    config: dict[str, Any] = Field(default_factory=dict)
-    stats: dict[str, Any] = Field(default_factory=dict)

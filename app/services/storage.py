@@ -2,9 +2,10 @@ import asyncio
 import base64
 import logging
 import re
+from typing import Protocol
 
 from app.core.firebase import get_storage_bucket
-from app.pipeline.models import chapter_page_storage_path, manga_cover_storage_path
+from app.pipeline.models import manga_cover_storage_path
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,12 @@ def _upload_bytes_sync(storage_path: str, data: bytes, content_type: str) -> Non
     blob.upload_from_string(data, content_type=content_type)
 
 
+class PageUploadPayload(Protocol):
+    storage_path: str
+    data: bytes
+    content_type: str
+
+
 async def upload_manga_cover(slug: str, data_uri: str) -> str:
     """Upload a cover image and return its Storage object path."""
     mime, data = parse_data_uri(data_uri)
@@ -47,21 +54,20 @@ async def upload_manga_cover(slug: str, data_uri: str) -> str:
 async def upload_chapter_pages(
     manga_slug: str,
     chapter_number: str,
-    page_data_uris: list[str],
-) -> list[str]:
-    """Upload chapter page images and return ordered Storage object paths."""
-    storage_paths: list[str] = []
-    for page_index, data_uri in enumerate(page_data_uris):
-        mime, data = parse_data_uri(data_uri)
-        extension = MIME_EXTENSIONS.get(mime, 'jpg')
-        storage_path = chapter_page_storage_path(manga_slug, chapter_number, page_index, extension)
-        await asyncio.to_thread(_upload_bytes_sync, storage_path, data, mime)
-        storage_paths.append(storage_path)
+    pages: list[PageUploadPayload],
+) -> None:
+    """Upload chapter page images already parsed and assigned storage paths."""
+    for page in pages:
+        await asyncio.to_thread(
+            _upload_bytes_sync,
+            page.storage_path,
+            page.data,
+            page.content_type,
+        )
 
     logger.info(
         'Uploaded %d page(s) for %s chapter %s',
-        len(storage_paths),
+        len(pages),
         manga_slug,
         chapter_number,
     )
-    return storage_paths
