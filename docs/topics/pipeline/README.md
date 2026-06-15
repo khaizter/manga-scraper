@@ -11,7 +11,7 @@ Three pipelines run in sequence. Each has its own doc with goals, flow, CLI flag
 | Pipeline | Doc | CLI command |
 |----------|-----|-------------|
 | Discover | [discover.md](./discover.md) | `python cli.py pipeline discover` |
-| Sync manga | [sync-manga.md](./sync-manga.md) | `python cli.py pipeline sync` |
+| Sync manga | [sync-manga.md](./sync-manga.md) | `python cli.py pipeline sync-manga` |
 | Sync chapters | [sync-chapters.md](./sync-chapters.md) | `python cli.py pipeline sync-chapters` |
 
 Shared data shapes and Storage layout: [data-model.md](./data-model.md)
@@ -122,7 +122,7 @@ Props are the **only** limit on how much work a run does.
 
 ```powershell
 python cli.py pipeline discover ...
-python cli.py pipeline sync ...
+python cli.py pipeline sync-manga ...
 python cli.py pipeline sync-chapters ...
 python cli.py pipeline status
 ```

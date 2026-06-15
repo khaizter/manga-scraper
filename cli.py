@@ -99,8 +99,8 @@ def pipeline_discover(
     typer.echo(json.dumps(stats, indent=2, default=str))
 
 
-@pipeline_app.command('sync')
-def pipeline_sync(
+@pipeline_app.command('sync-manga')
+def pipeline_sync_manga(
     limit: int = typer.Option(10, '--limit', '-n', help='Max mangas to sync this run'),
     delay: float = typer.Option(30.0, '--delay', help='Seconds between manga scrapes'),
     dry_run: bool = typer.Option(False, '--dry-run', help='Scrape mangas without writing to Firestore/Storage'),

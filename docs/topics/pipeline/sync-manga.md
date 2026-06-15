@@ -106,7 +106,7 @@ Updates the existing manga doc — does not create chapter stubs.
 ## CLI
 
 ```powershell
-python cli.py pipeline sync --limit 10 --delay 30 --dry-run --verbose
+python cli.py pipeline sync-manga --limit 10 --delay 30 --dry-run --verbose
 ```
 
 | Flag | Default | Purpose |
