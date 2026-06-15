@@ -2,7 +2,7 @@ from pydoll.browser.tab import Tab
 
 from app.pipeline.models import ChapterDocument
 from app.pipeline.sync_chapter.types import ChapterExtractResult
-from app.services.manga_chapter import scrape_chapter_pages_on_tab
+from app.services.scrape_chapter_pages import scrape_chapter_pages_on_tab
 
 
 async def extract_chapter(

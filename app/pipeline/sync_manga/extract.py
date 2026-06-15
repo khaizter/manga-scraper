@@ -4,7 +4,7 @@ from pydoll.browser.tab import Tab
 
 from app.pipeline.sync_manga.types import MangaExtractResult
 from app.services.chapters_api import fetch_chapter_numbers
-from app.services.manga import scrape_manga_detail_on_tab
+from app.services.scrape_manga_details import scrape_manga_detail_on_tab
 
 
 async def extract_manga(tab: Tab, slug: str) -> MangaExtractResult:

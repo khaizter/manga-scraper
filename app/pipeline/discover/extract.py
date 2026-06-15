@@ -3,7 +3,7 @@ from pydoll.browser.tab import Tab
 from app.core.config import LIST_URL
 from app.core.browser import navigate_to
 from app.pipeline.discover.types import PageExtractResult
-from app.services.manga_list import scrape_list_page_slugs
+from app.services.scrape_manga_slugs import scrape_list_page_slugs
 
 
 async def extract_listing_page(tab: Tab, page: int) -> PageExtractResult:

@@ -11,9 +11,9 @@ load_env()
 
 from app.core.config import BASE_URL, LIST_URL
 from app.pipeline.runner import PipelineRunner
-from app.services.manga import get_manga
-from app.services.manga_chapter import get_manga_chapter
-from app.services.manga_list import get_manga_list
+from app.services.scrape_chapter_pages import get_manga_chapter
+from app.services.scrape_manga_details import get_manga
+from app.services.scrape_manga_slugs import get_manga_list
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')

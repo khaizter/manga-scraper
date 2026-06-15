@@ -7,9 +7,9 @@ from app.schemas.manga import (
     MangaListRequest,
     MangaListResponse,
 )
-from app.services.manga import get_manga
-from app.services.manga_chapter import get_manga_chapter
-from app.services.manga_list import get_manga_list
+from app.services.scrape_chapter_pages import get_manga_chapter
+from app.services.scrape_manga_details import get_manga
+from app.services.scrape_manga_slugs import get_manga_list
 
 router = APIRouter(prefix='/api', tags=['mangas'])
 

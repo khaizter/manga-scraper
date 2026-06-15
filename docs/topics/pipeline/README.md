@@ -215,5 +215,8 @@ app/pipeline/
   sync_chapter/          → see sync-chapters.md
 
 app/services/
-  storage.py             Firebase Storage uploads
+  scrape_manga_details.py  Manga detail scraping
+  scrape_manga_slugs.py    Listing page slug scraping
+  scrape_chapter_pages.py  Chapter page scraping
+  storage.py               Firebase Storage uploads
 ```

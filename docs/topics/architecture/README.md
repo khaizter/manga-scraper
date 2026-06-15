@@ -58,16 +58,16 @@ bucket = get_storage_bucket()
 
 | Module | Responsibility |
 |--------|----------------|
-| `manga.py` | Scrape manga detail from the browser |
-| `manga_chapter.py` | Scrape chapter page images |
-| `manga_list.py` | Scrape listing page slugs |
+| `scrape_manga_details.py` | Scrape manga detail from the browser |
+| `scrape_chapter_pages.py` | Scrape chapter page images |
+| `scrape_manga_slugs.py` | Scrape listing page slugs |
 | `chapters_api.py` | HTTP fetch for chapter numbers |
 | `storage.py` | Upload cover/pages to Firebase Storage |
 
 Services are used by:
 
 - **CLI one-off commands** (`cli.py list`, `detail`, `chapter`)
-- **Pipeline extract/load stages** (e.g. `extract_manga` → `services/manga.py`, load → `services/storage.py`)
+- **Pipeline extract/load stages** (e.g. `extract_manga` → `services/scrape_manga_details.py`, load → `services/storage.py`)
 
 Services do **not** decide which mangas are pending, how retries work, or how chapters are ordered in the queue. They receive inputs (a slug, a data URI, a list of page bytes) and return outputs.
 
@@ -141,7 +141,7 @@ cli.py
   → PipelineRunner                    (pipeline/runner.py)
     → SyncMangaPipeline.run()           (pipeline/sync_manga/pipeline.py)
       → generator                       (pipeline/store.py — get_pending_mangas)
-      → extract_manga                   (services/manga.py + services/chapters_api.py)
+      → extract_manga                   (services/scrape_manga_details.py + services/chapters_api.py)
       → transform_manga                 (pipeline/models.py — pure)
       → load_success                    (services/storage.py + pipeline/store.py)
 ```
@@ -157,7 +157,7 @@ cli.py
 |----------|-------|
 | Initialize Firebase SDK? | `core/firebase.py` |
 | Navigate Chrome to a URL? | `core/browser.py` |
-| Scrape one manga’s detail page? | `services/manga.py` |
+| Scrape one manga’s detail page? | `services/scrape_manga_details.py` |
 | Upload bytes to a Storage path? | `services/storage.py` |
 | Define `scrapeStatus` and document fields? | `pipeline/models.py` |
 | Query pending mangas for the queue? | `pipeline/store.py` |
