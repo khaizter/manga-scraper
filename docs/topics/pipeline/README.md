@@ -2,6 +2,8 @@
 
 The manga-scraper batch system is built as independent **ETL pipelines** that share a common structure, store layer, and CLI entry point. Each pipeline scrapes data from the site, shapes it into Firestore/Storage documents, and persists it in bounded batches controlled by CLI props.
 
+For how `core/`, `services/`, and `pipeline/store.py` fit together, see [App layer hierarchy](../architecture/README.md).
+
 ## Pipelines
 
 Three pipelines run in sequence. Each has its own doc with goals, flow, CLI flags, and stats output:
