@@ -3,11 +3,16 @@ services:
     build: .
     ports:
       - "8001:8000"
+    env_file:
+      - .env
     environment:
       CHROME_BIN: /usr/bin/google-chrome
       CHROME_HEADLESS: "false"
       DISPLAY: ":99"
+      GOOGLE_APPLICATION_CREDENTIALS: ${FIREBASE_CREDENTIALS_CONTAINER_PATH}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_CONTAINER_PATH}
     volumes:
       - ./app:/app/app
+      - ./credentials:/app/credentials:ro
     shm_size: "2gb"
     restart: unless-stopped

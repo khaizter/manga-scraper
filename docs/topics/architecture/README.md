@@ -157,6 +157,7 @@ cli.py
 |----------|-------|
 | Initialize Firebase SDK? | `core/firebase.py` |
 | Navigate Chrome to a URL? | `core/browser.py` |
+| Click Cloudflare Turnstile? | `core/browser.py` (`CHROME_CLOUDFLARE_CHECKBOX_SELECTORS`) |
 | Scrape one manga’s detail page? | `services/scrape_manga_details.py` |
 | Upload bytes to a Storage path? | `services/storage.py` |
 | Define `scrapeStatus` and document fields? | `pipeline/models.py` |

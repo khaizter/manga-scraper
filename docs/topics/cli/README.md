@@ -19,23 +19,27 @@ python cli.py chapter black-clover chapter-336-1
 
 ## Pipeline
 
-Set store for real writes:
+Docker loads `.env` via `env_file` in `docker-compose.yml`
+
+Set store for real writes (also in `.env`):
 
 ```powershell
 $env:PIPELINE_STORE = "firestore"
 ```
 
-Local JSON store (default, no Firebase):
+Local JSON store (default if unset):
 
 ```powershell
 $env:PIPELINE_STORE = "json"
 ```
 
+Docker also mounts `./credentials` → `/app/credentials` for Firebase. Set `FIREBASE_CREDENTIALS_CONTAINER_PATH` in `.env` to the in-container JSON path.
+
 ### Discover
 
 ```powershell
 # Dry run — scrape only, no writes
-python cli.py pipeline discover --start-page 1 --page-count 1 --dry-run --verbose
+python cli.py pipeline discover --start-page 5 --page-count 1 --dry-run --verbose
 
 # Enqueue pending stubs
 python cli.py pipeline discover --start-page 1 --page-count 3 --delay 2
@@ -68,6 +72,17 @@ python cli.py pipeline sync-chapters --limit 3 --delay 30
 ```powershell
 python cli.py pipeline status
 ```
+
+### Cloudflare Turnstile (optional env)
+
+If the checkbox DOM changes, override selectors (comma-separated, tried in order):
+
+```powershell
+$env:CHROME_CLOUDFLARE_CHECKBOX_SELECTORS = 'input[type="checkbox"],label'
+python cli.py list --page 1
+```
+
+Prefer stable selectors like `input[type="checkbox"]` over obfuscated classes (e.g. `CDDrW6`).
 
 ## Common flags
 
