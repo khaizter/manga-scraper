@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from dataclasses import dataclass
 
 from pydoll.browser.chromium import Chrome
 from pydoll.browser.options import ChromiumOptions
@@ -14,9 +15,13 @@ DEFAULT_START_RETRIES = 3
 DEFAULT_START_RETRY_DELAY = 2.0
 DEFAULT_CLOUDFLARE_WAIT = 45
 DEFAULT_CLOUDFLARE_POST_CLICK_WAIT = 3.0
+DEFAULT_PAGE_GUARD_WAIT = 60
 
 CLOUDFLARE_CHALLENGE_DOMAIN = 'challenges.cloudflare.com'
 CLOUDFLARE_IFRAME_SELECTOR = f'iframe[src*="{CLOUDFLARE_CHALLENGE_DOMAIN}"]'
+
+DEFAULT_PAGE_GUARD_LOGO_SELECTOR = 'div.top-logo'
+DEFAULT_PAGE_GUARD_LISTING_SELECTOR = 'div.comic-list div.list-comic-item-wrap'
 
 # Obfuscated Turnstile classes (e.g. CDDrW6) rotate; prefer stable selectors.
 # Override: CHROME_CLOUDFLARE_CHECKBOX_SELECTORS=input[type="checkbox"],label
@@ -56,6 +61,87 @@ def _cloudflare_checkbox_selectors() -> tuple[str, ...]:
     if not raw:
         return DEFAULT_CLOUDFLARE_CHECKBOX_SELECTORS
     return tuple(selector.strip() for selector in raw.split(',') if selector.strip())
+
+
+def _page_guard_logo_selector() -> str:
+    return os.getenv('CHROME_PAGE_GUARD_LOGO_SELECTOR', DEFAULT_PAGE_GUARD_LOGO_SELECTOR)
+
+
+def _page_guard_listing_selector() -> str:
+    return os.getenv('CHROME_PAGE_GUARD_LISTING_SELECTOR', DEFAULT_PAGE_GUARD_LISTING_SELECTOR)
+
+
+@dataclass(frozen=True)
+class PageGuardStatus:
+    logo_present: bool
+    listing_present: bool
+    cloudflare_challenge_present: bool
+    page_url: str
+
+
+async def _selector_present(tab: Tab, selector: str, *, timeout: float = 0) -> bool:
+    element = await tab.query(selector, timeout=timeout, raise_exc=False)
+    return element is not None
+
+
+async def _cloudflare_challenge_visible(tab: Tab) -> bool:
+    try:
+        await _find_cloudflare_shadow_root(tab, timeout=1)
+        return True
+    except WaitElementTimeout:
+        return False
+
+
+async def check_page_guard(tab: Tab) -> PageGuardStatus:
+    """Check whether the real site chrome and listing markup are present."""
+    logo_selector = _page_guard_logo_selector()
+    listing_selector = _page_guard_listing_selector()
+    query_timeout = 2
+
+    return PageGuardStatus(
+        logo_present=await _selector_present(tab, logo_selector, timeout=query_timeout),
+        listing_present=await _selector_present(tab, listing_selector, timeout=query_timeout),
+        cloudflare_challenge_present=await _cloudflare_challenge_visible(tab),
+        page_url=await tab.current_url,
+    )
+
+
+def _log_page_guard(status: PageGuardStatus, *, level: int) -> None:
+    passed = status.logo_present or status.listing_present
+    message = (
+        'Page guard: logo=%s (%s) listing=%s (%s) cloudflare_challenge=%s url=%s'
+    )
+    args = (
+        status.logo_present,
+        _page_guard_logo_selector(),
+        status.listing_present,
+        _page_guard_listing_selector(),
+        status.cloudflare_challenge_present,
+        status.page_url,
+    )
+    if passed:
+        logger.log(level, 'Page guard passed — ' + message, *args)
+    else:
+        logger.log(level, 'Page guard failed — ' + message, *args)
+
+
+async def wait_for_page_guard(tab: Tab, timeout: float | None = None) -> PageGuardStatus:
+    """Wait until site logo or listing appears, or timeout."""
+    wait_seconds = timeout if timeout is not None else float(
+        os.getenv('CHROME_PAGE_GUARD_WAIT', DEFAULT_PAGE_GUARD_WAIT),
+    )
+    deadline = asyncio.get_event_loop().time() + wait_seconds
+    last_status = await check_page_guard(tab)
+
+    while asyncio.get_event_loop().time() < deadline:
+        if last_status.logo_present or last_status.listing_present:
+            _log_page_guard(last_status, level=logging.INFO)
+            return last_status
+        await asyncio.sleep(0.5)
+        last_status = await check_page_guard(tab)
+
+    _log_page_guard(last_status, level=logging.WARNING)
+    return last_status
 
 
 async def start_tab(browser: Chrome) -> Tab:
@@ -139,6 +225,14 @@ async def bypass_cloudflare_turnstile(tab: Tab, timeout: float | None = None) ->
 
 
 async def navigate_to(tab: Tab, url: str) -> None:
-    """Navigate and attempt to click Cloudflare Turnstile when present."""
+    """Navigate, bypass Turnstile when present, then wait for site page guard."""
     await tab.go_to(url)
-    await bypass_cloudflare_turnstile(tab)
+    clicked = await bypass_cloudflare_turnstile(tab)
+    if clicked:
+        logger.info('Cloudflare checkbox clicked; waiting for site content to load')
+    status = await wait_for_page_guard(tab)
+    if not status.logo_present and not status.listing_present:
+        logger.warning(
+            'Site content not detected after navigation — possible Cloudflare block, '
+            'slow verification, or datacenter IP rejection',
+        )

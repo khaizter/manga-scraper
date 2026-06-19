@@ -84,6 +84,21 @@ python cli.py list --page 1
 
 Prefer stable selectors like `input[type="checkbox"]` over obfuscated classes (e.g. `CDDrW6`).
 
+After navigation, the scraper logs **page guard** status (site logo + listing selectors):
+
+```
+Page guard passed — logo=True (div.top-logo) listing=True (...) cloudflare_challenge=False url=...
+Page guard failed — logo=False ... cloudflare_challenge=True ...
+```
+
+Optional env:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CHROME_PAGE_GUARD_LOGO_SELECTOR` | `div.top-logo` | Site loaded indicator |
+| `CHROME_PAGE_GUARD_LISTING_SELECTOR` | `div.comic-list div.list-comic-item-wrap` | Listing ready indicator |
+| `CHROME_PAGE_GUARD_WAIT` | `60` | Seconds to wait after Cloudflare click |
+
 ## Common flags
 
 | Flag | Use on |
