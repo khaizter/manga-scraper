@@ -7,8 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+ARG TARGETARCH
+
 # xvfb/xauth: virtual display for Chrome (headless is blocked by the target site)
-# curl: healthcheck | wget: download Chrome | Chrome .deb pulls its own lib deps via apt
+# curl: healthcheck | wget: download Chrome on amd64
+# arm64: Google Chrome .deb is amd64-only today; use distro Chromium instead
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -17,9 +20,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11-utils \
     xvfb \
     xauth \
-    && wget -q -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
-    && apt-get install -y --no-install-recommends /tmp/google-chrome.deb \
-    && rm /tmp/google-chrome.deb \
+    && if [ "${TARGETARCH}" = "amd64" ]; then \
+         wget -q -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+         && apt-get install -y --no-install-recommends /tmp/google-chrome.deb \
+         && rm /tmp/google-chrome.deb; \
+       elif [ "${TARGETARCH}" = "arm64" ]; then \
+         apt-get install -y --no-install-recommends chromium \
+         && ln -sf /usr/bin/chromium /usr/bin/google-chrome; \
+       else \
+         echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1; \
+       fi \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
