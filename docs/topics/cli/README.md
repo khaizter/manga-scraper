@@ -39,7 +39,7 @@ Docker also mounts `./credentials` → `/app/credentials` for Firebase. Set `FIR
 
 ```powershell
 # Dry run — scrape only, no writes
-python cli.py pipeline discover --start-page 5 --page-count 1 --dry-run --verbose
+python cli.py pipeline discover --start-page 1 --page-count 1 --dry-run --verbose
 
 # Enqueue pending stubs
 python cli.py pipeline discover --start-page 1 --page-count 3 --delay 2
