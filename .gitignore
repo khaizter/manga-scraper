@@ -8,6 +8,9 @@ env/
 .env
 *-firebase-adminsdk-*.json
 service-account*.json
+credentials/brightdata/*.crt
+credentials/brightdata/*.zip
+credentials/brightdata/*.cer
 *.egg-info/
 dist/
 build/

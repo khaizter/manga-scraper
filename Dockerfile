@@ -37,6 +37,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY cli.py .
+COPY credentials/brightdata/ /app/credentials/brightdata/
 COPY entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 

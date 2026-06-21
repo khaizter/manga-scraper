@@ -97,7 +97,31 @@ Optional env:
 |----------|---------|---------|
 | `CHROME_PAGE_GUARD_LOGO_SELECTOR` | `div.top-logo` | Site loaded indicator |
 | `CHROME_PAGE_GUARD_LISTING_SELECTOR` | `div.comic-list div.list-comic-item-wrap` | Listing ready indicator |
+| `CHROME_CLOUDFLARE_POST_CLICK_WAIT` | `3` | Pause after clicking Turnstile |
+| `CHROME_CLOUDFLARE_RENDER_WAIT` | `3` | Wait for Turnstile widget to render in iframe |
+| `CHROME_CLOUDFLARE_RETRIES` | `3` | Bypass attempts per navigation |
 | `CHROME_PAGE_GUARD_WAIT` | `60` | Seconds to wait after Cloudflare click |
+| `CHROME_NAVIGATE_TIMEOUT` | `300` | Max seconds for navigation through proxy |
+
+### Optional proxy (Bright Data ISP)
+
+Omit to scrape without a proxy (default). Use your **ISP zone** credentials from the Bright Data dashboard (port **33335**, same SSL cert):
+
+```env
+CHROME_PROXY_URL=http://brd-customer-xxx-zone-isp_proxy1:password@brd.superproxy.io:33335
+CHROME_PROXY_WARMUP_URL=https://geo.brdtest.com/welcome.txt?product=isp&method=native
+CHROME_PROXY_CA_CERT=C:/path/to/credentials/brightdata/BrightData SSL certificate (port 33335).crt
+```
+
+The `.crt` is **loaded from file** at runtime (like `curl --cacert`), not installed to the OS. Use forward slashes in paths on Windows.
+
+Docker/Cloud Run: the Bright Data `.crt` is copied into the image at build time (`credentials/brightdata/` → `/app/credentials/brightdata/`). Set `CHROME_PROXY_CA_CERT` to the in-container path, or rely on auto-discovery if the file is present.
+
+For Cloud Run jobs, also set `CHROME_PROXY_URL`, `CHROME_PROXY_WARMUP_URL`, and `PIPELINE_STORE=firestore`.
+
+Logs show `Using Chrome proxy host:port` (credentials are not logged).
+
+For Cloud Run jobs, add `CHROME_PROXY_URL`, `CHROME_PROXY_CA_CERT`, and optionally `CHROME_PROXY_WARMUP_URL` on the job configuration.
 
 ## Common flags
 
