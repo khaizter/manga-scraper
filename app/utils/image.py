@@ -2,11 +2,11 @@ import asyncio
 import base64
 from urllib.parse import urljoin, urlparse
 
-import aiohttp
 from pydoll.browser.tab import Tab
 from pydoll.elements.web_element import WebElement
 
 from app.core.config import BASE_URL
+from app.core.http_client import http_session, resolve_http_proxy
 
 IMAGE_MIME_TYPES = {
     '.webp': 'image/webp',
@@ -47,8 +47,8 @@ def build_image_data_uri(image_base64: str, url: str) -> str:
 
 
 async def fetch_image_base64(url: str) -> str:
-    async with aiohttp.ClientSession(headers=DEFAULT_HEADERS) as session:
-        async with session.get(url) as response:
+    async with http_session(DEFAULT_HEADERS) as session:
+        async with session.get(url, proxy=resolve_http_proxy()) as response:
             response.raise_for_status()
             return base64.b64encode(await response.read()).decode('ascii')
 
