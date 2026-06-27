@@ -14,6 +14,8 @@ from app.utils.image import fetch_image_data_uri_from_element
 logger = logging.getLogger(__name__)
 
 LIST_ITEM_SCOPE = 'div.comic-list div.list-comic-item-wrap'
+TITLE_LINK_SELECTOR = 'h3 > a'
+DESCRIPTION_SELECTOR = 'p'
 COVER_IMAGE_SELECTOR = 'a.cover > img'
 PAGINATION_SELECTOR = 'div.group_page > a'
 
@@ -38,28 +40,44 @@ def extract_page_from_href(href: str) -> int | None:
 
 class MangaListItem(ExtractionModel):
     title: str = Field(
-        selector='h3 > a',
+        selector=TITLE_LINK_SELECTOR,
         description='Manga title',
     )
     slug: str = Field(
-        selector='h3 > a',
+        selector=TITLE_LINK_SELECTOR,
         attribute='href',
         description='Manga slug from detail page URL',
         transform=extract_slug,
     )
     description: Optional[str] = Field(
-        selector='p',
+        selector=DESCRIPTION_SELECTOR,
         description='Manga synopsis',
         default=None,
     )
 
 
-async def get_list_item_image_data_uri(container) -> str:
-    """Fetch the cover image inside a list-item container as a data: URI."""
+async def extract_list_item_from_container(container) -> MangaListItem:
+    """Extract a MangaListItem from an already-located list-item container."""
+    title_el = await container.query(TITLE_LINK_SELECTOR, timeout=SCRAPE_TIMEOUT, raise_exc=True)
+    title = await title_el.text
+    href = title_el.get_attribute('href') or ''
+    slug = extract_slug(href)
+
+    desc_el = await container.query(DESCRIPTION_SELECTOR, timeout=SCRAPE_TIMEOUT, raise_exc=False)
+    description = await desc_el.text if desc_el else None
+
+    return MangaListItem(title=title, slug=slug, description=description)
+
+
+async def process_list_item(container) -> dict[str, Any]:
+    item = await extract_list_item_from_container(container)
+    # Query the img separately so fetch_image_data_uri_from_element can fall back
+    # to JS `return this.src` when src/data-src are not available yet (lazy load).
     img = await container.query(COVER_IMAGE_SELECTOR, raise_exc=False)
     if not img:
-        return ''
-    return await fetch_image_data_uri_from_element(img) or ''
+        return {**item.model_dump(), 'imageDataUri': ''}
+    image_data_uri = await fetch_image_data_uri_from_element(img) or ''
+    return {**item.model_dump(), 'imageDataUri': image_data_uri}
 
 
 async def get_total_pages(tab: Tab) -> int | None:
@@ -102,15 +120,6 @@ async def get_manga_list(page: int = 1) -> dict[str, Any]:
         tab = await start_tab(browser)
         await navigate_to(tab, f'{LIST_URL}?page={page}')
         total_pages = await get_total_pages(tab)
-        items = await tab.extract_all(
-            MangaListItem,
-            scope=LIST_ITEM_SCOPE,
-            timeout=SCRAPE_TIMEOUT,
-        )
-
-        if not items:
-            return {'items': [], 'totalPages': total_pages}
-
         containers = await tab.query(
             LIST_ITEM_SCOPE,
             find_all=True,
@@ -119,19 +128,10 @@ async def get_manga_list(page: int = 1) -> dict[str, Any]:
         )
 
         if not containers:
-            return {
-                'items': [{**item.model_dump(), 'imageDataUri': ''} for item in items],
-                'totalPages': total_pages,
-            }
+            return {'items': [], 'totalPages': total_pages}
 
-        image_data_uris = await asyncio.gather(
-            *[get_list_item_image_data_uri(container) for container in containers]
+        items = await asyncio.gather(
+            *[process_list_item(container) for container in containers]
         )
 
-        return {
-            'items': [
-                {**item.model_dump(), 'imageDataUri': image_data_uri}
-                for item, image_data_uri in zip(items, image_data_uris)
-            ],
-            'totalPages': total_pages,
-        }
+        return {'items': list(items), 'totalPages': total_pages}
