@@ -127,10 +127,17 @@ python cli.py pipeline sync-chapters ...
 python cli.py pipeline status
 ```
 
+Use `--non-proxy` before the subcommand for local runs when `.env` has `CHROME_PROXY_URL` but you do not want to consume proxy bandwidth (see [cli/README.md](../cli/README.md#optional-proxy-bright-data-isp)):
+
+```powershell
+python cli.py --non-proxy pipeline discover --start-page 1 --page-count 1 --dry-run
+```
+
 Shared flags across sync pipelines:
 
 | Flag | Effect |
 |------|--------|
+| `--non-proxy` | Connect directly; ignore `CHROME_PROXY_URL` for this run (CLI global option) |
 | `--dry-run` | Extract + transform run; load skips all writes |
 | `--verbose` / `-v` | Log full scraped payloads after transform |
 | `--delay` | Seconds between work items |

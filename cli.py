@@ -10,6 +10,7 @@ from app.core.env import load_env
 load_env()
 
 from app.core.config import BASE_URL, LIST_URL
+from app.core.proxy import set_proxy_enabled
 from app.pipeline.runner import PipelineRunner
 from app.services.scrape_chapter_pages import get_manga_chapter
 from app.services.scrape_manga_details import get_manga
@@ -23,6 +24,18 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(mess
 app = typer.Typer(help='Scrape manga from mangakakalot.gg')
 pipeline_app = typer.Typer(help='Batch pipeline for discovery and sync')
 app.add_typer(pipeline_app, name='pipeline')
+
+
+@app.callback()
+def main(
+    non_proxy: bool = typer.Option(
+        False,
+        '--non-proxy',
+        help='Connect directly without CHROME_PROXY_URL (for local testing)',
+    ),
+) -> None:
+    if non_proxy:
+        set_proxy_enabled(False)
 
 
 @app.command('list')
@@ -69,7 +82,7 @@ def manga_chapter(
     typer.echo(f'Scraping {BASE_URL}/manga/{manga_slug}/{chapter_slug} ...')
     result = asyncio.run(get_manga_chapter(manga_slug, chapter_slug))
 
-    if not result['pages']:
+    if not any(result['pages']):
         typer.echo('No chapter images found.', err=True)
         raise typer.Exit(code=1)
 

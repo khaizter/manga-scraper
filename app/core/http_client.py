@@ -1,23 +1,18 @@
 import logging
-import os
 import ssl
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 import aiohttp
 
+from app.core.proxy import resolve_proxy_url
 from app.core.proxy_ca import resolve_proxy_ca_cert_path
 
 logger = logging.getLogger(__name__)
 
 
 def resolve_http_proxy() -> str | None:
-    proxy_url = os.getenv('CHROME_PROXY_URL', '').strip()
-    if not proxy_url:
-        return None
-    if '://' not in proxy_url:
-        proxy_url = f'http://{proxy_url}'
-    return proxy_url
+    return resolve_proxy_url()
 
 
 def _proxy_ssl_context() -> ssl.SSLContext | None:

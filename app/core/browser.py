@@ -16,6 +16,7 @@ from pydoll.exceptions import (
     WaitElementTimeout,
 )
 
+from app.core.proxy import resolve_proxy_url
 from app.core.proxy_ca import configure_chrome_proxy_ssl
 
 logger = logging.getLogger(__name__)
@@ -60,14 +61,9 @@ def _resolve_proxy_server_url() -> str | None:
 
     Example: http://user:pass@proxy-host:6754
 
-    When unset, returns None and Chrome connects directly.
+    When unset or disabled (--non-proxy), returns None and Chrome connects directly.
     """
-    proxy_url = os.getenv('CHROME_PROXY_URL', '').strip()
-    if not proxy_url:
-        return None
-    if '://' not in proxy_url:
-        proxy_url = f'http://{proxy_url}'
-    return proxy_url
+    return resolve_proxy_url()
 
 
 def _navigate_timeout() -> int:
