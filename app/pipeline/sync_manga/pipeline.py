@@ -49,12 +49,14 @@ class SyncMangaPipeline:
                     processed_any = True
                     batch_slugs.append(existing.slug)
 
+                    # Mark as processing
                     if not props.dry_run:
                         existing.scrape_status = ScrapeStatus.PROCESSING
                         existing.last_attempt_at = utcnow()
                         await self.store.upsert_manga(existing)
 
                     try:
+                        # Extract manga details via scrape_manga_details
                         raw = await extract_manga(tab, existing.slug)
                         item = transform_manga(raw, existing)
                         await load_success(self.store, item, dry_run=props.dry_run)

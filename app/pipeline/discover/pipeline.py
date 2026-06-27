@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from pydoll.browser.chromium import Chrome
@@ -38,6 +39,7 @@ class DiscoverPipeline:
             options = get_chrome_options()
             async with Chrome(options=options) as browser:
                 tab = await start_tab(browser)
+                index = 0
 
                 async for page_result in generator(tab, props):
                     batch = transform_page(page_result)
@@ -64,6 +66,9 @@ class DiscoverPipeline:
                         })
                         logger.error('Discover page %d failed: %s', batch.page, batch.error)
 
+                    if index < props.page_count - 1:
+                        await asyncio.sleep(props.delay_seconds)
+                    index += 1
             stats['status'] = resolve_job_status(
                 stats['pagesSucceeded'],
                 stats['pagesFailed'],

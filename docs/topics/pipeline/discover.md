@@ -14,6 +14,7 @@ generator (listing pages)
 
 - **Work unit:** one listing page → many slugs
 - **Generator** walks pages from `start_page` to `end_page`; extract runs inside the generator
+- **Pipeline** applies `delay_seconds` between pages (same pattern as sync-manga / sync-chapter)
 - **Load** creates `MangaDocument.pending_stub(slug)` for slugs not already in the store (skips existing non-failed entries)
 - Failed pages are recorded in `failedPages`; other pages continue
 
