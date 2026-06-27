@@ -124,6 +124,7 @@ class JsonFileStore(MangaStore):
             ):
                 pending.append(manga)
 
+        # processing first, then pending, then failed; oldest discovered_at first within each group
         pending.sort(key=lambda manga: (
             SYNCABLE_STATUSES.index(manga.scrape_status),
             manga.discovered_at,
@@ -213,6 +214,13 @@ class FirestoreStore(MangaStore):
         return added
 
     def _get_pending_mangas_sync(self, limit: int) -> list[MangaDocument]:
+        # Simple version for now: stream all syncable docs, sort in Python, then [:limit].
+        # Firestore could use tiered queries (processing → pending → failed, each with
+        # .where('attempts', '<', max).order_by(...).limit(remaining)), but that needs
+        # composite indexes and still can't be a single `!= synced` + limit query — status
+        # priority and attempts filtering don't map to one ordered Firestore query.
+        # This matches JsonFileStore (scan all, sort, slice) and is fine while the pending
+        # queue stays small; revisit when read costs grow with catalog size.
         pending: list[MangaDocument] = []
         for status in SYNCABLE_STATUSES:
             query = self._collection.where('scrapeStatus', '==', status.value)
@@ -221,6 +229,7 @@ class FirestoreStore(MangaStore):
                 if manga.attempts < PIPELINE_MAX_RETRIES:
                     pending.append(manga)
 
+        # processing first, then pending, then failed; oldest discovered_at first within each group
         pending.sort(key=lambda manga: (
             SYNCABLE_STATUSES.index(manga.scrape_status),
             manga.discovered_at,
