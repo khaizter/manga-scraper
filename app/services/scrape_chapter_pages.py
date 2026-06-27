@@ -30,7 +30,8 @@ async def scrape_chapter_pages_on_tab(
     data_uris = await asyncio.gather(
         *[fetch_image_data_uri_from_element(img) for img in imgs]
     )
-    return [uri for uri in data_uris if uri]
+    # Keep one slot per DOM img; failed fetches become '' to preserve page order.
+    return [uri or '' for uri in data_uris]
 
 
 async def scrape_chapter_pages(manga_slug: str, chapter_slug: str) -> list[str]:

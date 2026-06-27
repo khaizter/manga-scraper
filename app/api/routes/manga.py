@@ -37,7 +37,7 @@ async def manga_chapter(slug: str, chapter_number: str) -> MangaChapterResponse:
     chapter_slug = to_chapter_slug(chapter_number)
     result = await get_manga_chapter(slug, chapter_slug)
 
-    if not result['pages']:
+    if not any(result['pages']):
         raise HTTPException(status_code=404, detail='No chapter images found')
 
     return MangaChapterResponse.model_validate({

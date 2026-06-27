@@ -6,7 +6,7 @@ from app.services.storage import MIME_EXTENSIONS, parse_data_uri
 
 def transform_chapter(extract: ChapterExtractResult) -> SyncChapterLoadItem:
     """Shape scraped pages into upload payloads and a chapter document."""
-    if not extract.page_data_uris:
+    if not extract.page_data_uris or not any(extract.page_data_uris):
         raise ValueError('No chapter pages found')
 
     if PIPELINE_STORE != 'firestore':
@@ -16,6 +16,10 @@ def transform_chapter(extract: ChapterExtractResult) -> SyncChapterLoadItem:
     storage_paths: list[str] = []
 
     for page_index, data_uri in enumerate(extract.page_data_uris):
+        if not data_uri:
+            storage_paths.append('')
+            continue
+
         mime, data = parse_data_uri(data_uri)
         extension = MIME_EXTENSIONS.get(mime, 'jpg')
         storage_path = chapter_page_storage_path(
