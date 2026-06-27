@@ -27,7 +27,15 @@ class SyncMangaPipeline:
                 await self.store.upsert_manga(manga)
 
     async def run(self, props: SyncMangaInput) -> dict:
-        stats: dict = {'processed': 0, 'failed': 0, 'skipped': 0, 'failedSlugs': []}
+        stats: dict = {
+            'limit': props.limit,
+            'delaySeconds': props.delay_seconds,
+            'dryRun': props.dry_run,
+            'processed': 0,
+            'failed': 0,
+            'skipped': 0,
+            'failedSlugs': [],
+        }
         batch_slugs: list[str] = []
         processed_any = False
 
@@ -86,7 +94,15 @@ class SyncMangaPipeline:
             raise
 
         if not processed_any:
-            return {'processed': 0, 'failed': 0, 'skipped': 0, 'message': 'No pending mangas'}
+            return {
+                'limit': props.limit,
+                'delaySeconds': props.delay_seconds,
+                'dryRun': props.dry_run,
+                'processed': 0,
+                'failed': 0,
+                'skipped': 0,
+                'message': 'No pending mangas',
+            }
 
         stats['status'] = resolve_job_status(stats['processed'], stats['failed']).value
         return stats

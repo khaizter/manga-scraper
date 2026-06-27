@@ -125,6 +125,9 @@ python cli.py pipeline sync-manga --limit 10 --delay 30 --dry-run --verbose
 
 ```json
 {
+  "limit": 10,
+  "delaySeconds": 30,
+  "dryRun": false,
   "processed": 8,
   "failed": 2,
   "skipped": 0,
@@ -138,7 +141,15 @@ python cli.py pipeline sync-manga --limit 10 --delay 30 --dry-run --verbose
 When no work is available:
 
 ```json
-{ "processed": 0, "failed": 0, "skipped": 0, "message": "No pending mangas" }
+{
+  "limit": 10,
+  "delaySeconds": 30,
+  "dryRun": false,
+  "processed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "message": "No pending mangas"
+}
 ```
 
 ## Store methods

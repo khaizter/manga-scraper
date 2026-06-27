@@ -20,7 +20,15 @@ class SyncChapterPipeline:
         self.store = store
 
     async def run(self, props: SyncChapterInput) -> dict:
-        stats: dict = {'processed': 0, 'failed': 0, 'skipped': 0, 'failedChapters': []}
+        stats: dict = {
+            'limit': props.limit,
+            'delaySeconds': props.delay_seconds,
+            'dryRun': props.dry_run,
+            'processed': 0,
+            'failed': 0,
+            'skipped': 0,
+            'failedChapters': [],
+        }
         processed_any = False
 
         try:
@@ -88,6 +96,9 @@ class SyncChapterPipeline:
 
         if not processed_any:
             return {
+                'limit': props.limit,
+                'delaySeconds': props.delay_seconds,
+                'dryRun': props.dry_run,
                 'processed': 0,
                 'failed': 0,
                 'skipped': 0,

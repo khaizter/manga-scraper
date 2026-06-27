@@ -25,6 +25,8 @@ class DiscoverPipeline:
             'startPage': props.start_page,
             'pageCount': props.page_count,
             'endPage': props.end_page,
+            'delaySeconds': props.delay_seconds,
+            'dryRun': props.dry_run,
             'discovered': 0,
             'enqueued': 0,
             'pagesSucceeded': 0,

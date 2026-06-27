@@ -96,6 +96,9 @@ Requires `PIPELINE_STORE=firestore` (transform enforces this for page uploads).
 
 ```json
 {
+  "limit": 10,
+  "delaySeconds": 30,
+  "dryRun": false,
   "processed": 3,
   "failed": 0,
   "skipped": 0,
@@ -117,7 +120,15 @@ Requires `PIPELINE_STORE=firestore` (transform enforces this for page uploads).
 When no work is available:
 
 ```json
-{ "processed": 0, "failed": 0, "skipped": 0, "message": "No pending chapters" }
+{
+  "limit": 10,
+  "delaySeconds": 30,
+  "dryRun": false,
+  "processed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "message": "No pending chapters"
+}
 ```
 
 ## Store methods

@@ -72,6 +72,8 @@ python cli.py pipeline discover --start-page 1 --page-count 3 --delay 2 --dry-ru
   "startPage": 1,
   "pageCount": 3,
   "endPage": 3,
+  "delaySeconds": 2,
+  "dryRun": false,
   "discovered": 120,
   "enqueued": 45,
   "pagesSucceeded": 3,
