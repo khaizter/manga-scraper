@@ -7,7 +7,7 @@ from pydoll.browser.tab import Tab
 from app.core.browser import get_chrome_options, navigate_to, start_tab
 from app.core.config import BASE_URL, SCRAPE_TIMEOUT
 from app.services.chapters_api import fetch_chapter_numbers
-from app.utils.image import fetch_image_data_uris_from_selector
+from app.utils.image import fetch_image_data_uri_from_element
 
 CHAPTER_IMAGE_SELECTOR = 'div.container-chapter-reader > img'
 
@@ -18,11 +18,19 @@ async def scrape_chapter_pages_on_tab(
     chapter_slug: str,
 ) -> list[str]:
     await navigate_to(tab, f'{BASE_URL}/manga/{manga_slug}/{chapter_slug}')
-    return await fetch_image_data_uris_from_selector(
-        tab,
+    imgs = await tab.query(
         CHAPTER_IMAGE_SELECTOR,
+        find_all=True,
         timeout=SCRAPE_TIMEOUT,
+        raise_exc=False,
     )
+    if not imgs:
+        return []
+
+    data_uris = await asyncio.gather(
+        *[fetch_image_data_uri_from_element(img) for img in imgs]
+    )
+    return [uri for uri in data_uris if uri]
 
 
 async def scrape_chapter_pages(manga_slug: str, chapter_slug: str) -> list[str]:

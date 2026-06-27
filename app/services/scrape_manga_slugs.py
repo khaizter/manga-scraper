@@ -55,6 +55,7 @@ class MangaListItem(ExtractionModel):
 
 
 async def get_list_item_image_data_uri(container) -> str:
+    """Fetch the cover image inside a list-item container as a data: URI."""
     img = await container.query(COVER_IMAGE_SELECTOR, raise_exc=False)
     if not img:
         return ''
