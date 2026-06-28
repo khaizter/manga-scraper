@@ -160,10 +160,17 @@ class JsonFileStore(MangaStore):
 
     async def get_pending_chapters(self, limit: int) -> list[PendingChapter]:
         synced_mangas = await self._list_synced_mangas()
-        chapters_by_manga = {
-            manga.slug: self._load_chapters(manga.slug)
-            for manga in synced_mangas
-        }
+        # chapters_by_manga: manga slug -> {chapter number -> ChapterDocument}
+        # Loaded from data/pipeline/mangas/{slug}/chapters.json per synced manga.
+        # Example:
+        #   "black-clover": {
+        #     "336-1": ChapterDocument(scrapeStatus=synced),
+        #     "336-2": ChapterDocument(scrapeStatus=pending),
+        #   }
+        #   "one-piece": {}  # no chapters.json yet — all stubs treated as pending
+        chapters_by_manga: dict[str, dict[str, ChapterDocument]] = {}
+        for manga in synced_mangas:
+            chapters_by_manga[manga.slug] = self._load_chapters(manga.slug)
         return select_pending_chapters(synced_mangas, chapters_by_manga, limit)
 
     async def count_pending_chapters(self) -> int:
@@ -269,10 +276,23 @@ class FirestoreStore(MangaStore):
 
     def _get_pending_chapters_sync(self, limit: int) -> list[PendingChapter]:
         synced_mangas = self._list_synced_mangas_sync()
-        chapters_by_manga = {
-            manga.slug: self._load_chapters_sync(manga.slug)
-            for manga in synced_mangas
-        }
+
+        # chapters_by_manga: manga slug -> {chapter number -> ChapterDocument}
+        # Loaded from mangas/{slug}/chapters/{chapterNumber} subdocs per synced manga.
+        # Example:
+        #   "black-clover": {
+        #     "336-1": ChapterDocument(scrapeStatus=synced),
+        #     "336-2": ChapterDocument(scrapeStatus=pending),
+        #     "336-3": ChapterDocument(scrapeStatus=failed),
+        #   }
+        #   "one-piece": {
+        #     "1": ChapterDocument(scrapeStatus=synced),
+        #   }
+        #   "naruto": {}  # no chapter subdocs yet — stubs created during selection
+        chapters_by_manga: dict[str, dict[str, ChapterDocument]] = {}
+        for manga in synced_mangas:
+            chapters_by_manga[manga.slug] = self._load_chapters_sync(manga.slug)
+
         return select_pending_chapters(synced_mangas, chapters_by_manga, limit)
 
     async def upsert_manga(self, manga: MangaDocument) -> None:
