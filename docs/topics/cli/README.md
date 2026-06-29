@@ -136,6 +136,37 @@ Docker/Cloud Run: the Bright Data `.crt` is copied into the image at build time 
 
 For Cloud Run jobs, also set `CHROME_PROXY_URL`, `CHROME_PROXY_WARMUP_URL`, and `PIPELINE_STORE=firestore`.
 
+### Cloud Run Jobs (pipeline CLI)
+
+Headed Chrome needs a virtual display. Use `/job-entrypoint.sh` — it starts Xvfb (same as the API container) then runs your command.
+
+**Container command / args:**
+
+```text
+command: ["/job-entrypoint.sh"]
+args:
+  - python
+  - cli.py
+  - pipeline
+  - sync-chapters
+  - --limit
+  - "1"
+  - --delay
+  - "10"
+  - --verbose
+```
+
+**gcloud (job template):**
+
+```bash
+gcloud run jobs create manga-sync-chapters \
+  --image=YOUR_IMAGE \
+  --command=/job-entrypoint.sh \
+  --args="python,cli.py,pipeline,sync-chapters,--limit,1,--delay,10,--verbose"
+```
+
+The API service keeps using `/entrypoint.sh` (Xvfb + uvicorn). Jobs use `/job-entrypoint.sh` (Xvfb + `exec` of the CLI).
+
 Logs show `Using Chrome proxy host:port` (credentials are not logged).
 
 For Cloud Run jobs, add `CHROME_PROXY_URL`, `CHROME_PROXY_CA_CERT`, and optionally `CHROME_PROXY_WARMUP_URL` on the job configuration.

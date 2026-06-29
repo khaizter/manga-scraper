@@ -38,8 +38,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY cli.py .
 COPY credentials/brightdata/ /app/credentials/brightdata/
+COPY start-xvfb.sh /start-xvfb.sh
 COPY entrypoint.sh /entrypoint.sh
-RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+COPY job-entrypoint.sh /job-entrypoint.sh
+RUN sed -i 's/\r$//' /start-xvfb.sh /entrypoint.sh /job-entrypoint.sh \
+    && chmod +x /start-xvfb.sh /entrypoint.sh /job-entrypoint.sh
 
 EXPOSE 8000
 
