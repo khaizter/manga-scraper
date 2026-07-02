@@ -1,10 +1,30 @@
 """Unit tests for the manga chapters API client."""
 
-import pytest
-from aioresponses import aioresponses
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.core.config import CHAPTERS_API_URL
+import pytest
+
 from app.services.chapters_api import fetch_chapter_numbers, to_chapter_number
+
+
+def _mock_http_json(payload: dict) -> MagicMock:
+    """Build mocks for `async with http_session() as session: async with session.get()`."""
+    response = AsyncMock()
+    response.raise_for_status = MagicMock()
+    response.json = AsyncMock(return_value=payload)
+
+    get_context = AsyncMock()
+    get_context.__aenter__ = AsyncMock(return_value=response)
+    get_context.__aexit__ = AsyncMock(return_value=None)
+
+    session = MagicMock()
+    session.get = MagicMock(return_value=get_context)
+
+    session_context = AsyncMock()
+    session_context.__aenter__ = AsyncMock(return_value=session)
+    session_context.__aexit__ = AsyncMock(return_value=None)
+
+    return session_context
 
 
 class TestToChapterNumber:
@@ -30,7 +50,6 @@ class TestFetchChapterNumbers:
     @pytest.mark.asyncio
     async def test_should_return_chapter_numbers_on_success(self) -> None:
         """Should parse chapter numbers from a successful API response."""
-        url = CHAPTERS_API_URL.format(slug="black-clover")
         payload = {
             "success": True,
             "data": {
@@ -41,8 +60,10 @@ class TestFetchChapterNumbers:
             },
         }
 
-        with aioresponses() as mocked:
-            mocked.get(url, payload=payload)
+        with patch(
+            "app.services.chapters_api.http_session",
+            return_value=_mock_http_json(payload),
+        ):
             chapters = await fetch_chapter_numbers("black-clover")
 
         assert chapters == ["336-1", "335"]
@@ -50,10 +71,10 @@ class TestFetchChapterNumbers:
     @pytest.mark.asyncio
     async def test_should_return_empty_list_when_success_is_false(self) -> None:
         """Should return an empty list when the API reports success=false."""
-        url = CHAPTERS_API_URL.format(slug="black-clover")
-
-        with aioresponses() as mocked:
-            mocked.get(url, payload={"success": False})
+        with patch(
+            "app.services.chapters_api.http_session",
+            return_value=_mock_http_json({"success": False}),
+        ):
             chapters = await fetch_chapter_numbers("black-clover")
 
         assert chapters == []
@@ -61,7 +82,6 @@ class TestFetchChapterNumbers:
     @pytest.mark.asyncio
     async def test_should_skip_chapters_without_slug(self) -> None:
         """Should ignore chapter entries that do not include chapter_slug."""
-        url = CHAPTERS_API_URL.format(slug="black-clover")
         payload = {
             "success": True,
             "data": {
@@ -73,8 +93,10 @@ class TestFetchChapterNumbers:
             },
         }
 
-        with aioresponses() as mocked:
-            mocked.get(url, payload=payload)
+        with patch(
+            "app.services.chapters_api.http_session",
+            return_value=_mock_http_json(payload),
+        ):
             chapters = await fetch_chapter_numbers("black-clover")
 
         assert chapters == ["1", "2"]
