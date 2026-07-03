@@ -171,6 +171,44 @@ The same Docker image runs pipeline jobs on **Cloud Run Jobs** with Xvfb + Chrom
 
 Cloud Run uses the service account's Application Default Credentials for Firestore — no JSON key mount needed if permissions are set correctly.
 
+### Auto-deploy (GitHub Actions)
+
+On every push to `main`, CI runs unit tests, then:
+
+1. Builds the Docker image
+2. Pushes to `asia-southeast1-docker.pkg.dev/mangako-91de7/manga-scraper/api` (`:latest` and `:<git-sha>`)
+3. Updates all Cloud Run jobs to the new image
+
+Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+
+#### One-time setup
+
+**1. Create a deploy service account** (GCP Console → IAM → Service Accounts):
+
+| Role | Why |
+|------|-----|
+| `Artifact Registry Writer` | Push Docker images |
+| `Cloud Run Admin` | Update job definitions |
+
+Download a JSON key for this service account.
+
+**2. Add GitHub repository secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|--------|--------|
+| `GCP_CREDENTIALS` | Full JSON contents of the deploy service account key |
+| `BRIGHTDATA_CA_CERT_BASE64` | Base64-encoded Bright Data `.crt` (required for proxy in the image) |
+
+To encode the cert on Windows PowerShell:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("credentials/brightdata/BrightData SSL certificate (port 33335).crt"))
+```
+
+**3. Push to `main`** — the deploy job runs after unit tests pass.
+
+PRs only run unit tests; deploy is skipped until merge.
+
 ## Documentation
 
 | Topic | Link |

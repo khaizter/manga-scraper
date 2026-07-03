@@ -9,6 +9,19 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GCP_PROJECT_ID: mangako-91de7
+  GCP_REGION: asia-southeast1
+  IMAGE: asia-southeast1-docker.pkg.dev/mangako-91de7/manga-scraper/api
+  CLOUD_RUN_JOBS: >-
+    api,
+    pipeline-discover,
+    pipeline-discover-dry-run,
+    pipeline-sync-chapters,
+    pipeline-sync-chapters-dry-run,
+    pipeline-sync-manga,
+    pipeline-sync-manga-dry-run
+
 jobs:
   unit-tests:
     name: Unit tests
@@ -32,3 +45,65 @@ jobs:
 
       - name: Run unit tests
         run: python -m pytest tests/unit
+
+  deploy:
+    name: Deploy to Cloud Run Jobs
+    needs: unit-tests
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare Bright Data CA cert
+        env:
+          BRIGHTDATA_CA_CERT_BASE64: ${{ secrets.BRIGHTDATA_CA_CERT_BASE64 }}
+        run: |
+          if [ -z "$BRIGHTDATA_CA_CERT_BASE64" ]; then
+            echo "BRIGHTDATA_CA_CERT_BASE64 not set; image will build without Bright Data cert"
+            exit 0
+          fi
+          mkdir -p "credentials/brightdata"
+          echo "$BRIGHTDATA_CA_CERT_BASE64" | base64 -d > "credentials/brightdata/BrightData SSL certificate (port 33335).crt"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update Cloud Run jobs
+        run: |
+          IMAGE_TAG="${{ env.IMAGE }}:${{ github.sha }}"
+          IFS=',' read -ra JOBS <<< "${{ env.CLOUD_RUN_JOBS }}"
+          for job in "${JOBS[@]}"; do
+            job="$(echo "$job" | xargs)"
+            echo "Updating job: $job -> $IMAGE_TAG"
+            gcloud run jobs update "$job" \
+              --project "${{ env.GCP_PROJECT_ID }}" \
+              --region "${{ env.GCP_REGION }}" \
+              --image "$IMAGE_TAG"
+          done
