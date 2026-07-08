@@ -1,19 +1,32 @@
 rules_version = '2';
 
+// The scraper pipeline writes via the Firebase Admin SDK (service account),
+// which bypasses these rules. These rules govern client SDK access.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2026, 7, 7);
+    // Public catalog — anyone can read manga metadata and chapters.
+    // Writes stay server-side via the Admin SDK (scraper), so client writes deny.
+    match /mangas/{slug} {
+      allow read: if true;
+      allow write: if false;
+
+      match /chapters/{chapterNumber} {
+        allow read: if true;
+        allow write: if false;
+      }
     }
+
+    // Per-user data (profile, settings, saved manga). Identity (email, name)
+    // lives in Firebase Auth. A signed-in user may only read/write their own doc.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /savedMangas/{mangaSlug} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Everything else is denied by default (no catch-all rule).
   }
 }

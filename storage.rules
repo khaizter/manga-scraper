@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// The scraper uploads covers and chapter pages via the Firebase Admin SDK,
+// which bypasses these rules. These rules govern client SDK access.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Public manga images (covers + chapter pages). Layout: mangas/{slug}/...
+    // Anyone can read; all uploads stay server-side via the Admin SDK.
+    match /mangas/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Everything else is denied by default (no catch-all rule).
+  }
+}
