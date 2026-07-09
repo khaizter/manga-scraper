@@ -97,14 +97,12 @@ async def _warm_up_proxy(tab: Tab) -> None:
     First navigation triggers pydoll's browser-level Fetch proxy auth.
 
     Do not enable tab-level Fetch — it conflicts with browser-level proxy auth.
+    Raises on failure so the job aborts before scraping with a broken proxy path.
     """
     warmup_url = os.getenv('CHROME_PROXY_WARMUP_URL', DEFAULT_PROXY_WARMUP_URL).strip()
     logger.info('Warming up proxy via browser-level auth (%s)', warmup_url)
-    try:
-        await _go_to(tab, warmup_url, timeout=min(_navigate_timeout(), 90))
-        logger.info('Proxy warm-up complete')
-    except Exception as exc:
-        logger.warning('Proxy warm-up failed (continuing anyway): %s', exc)
+    await _go_to(tab, warmup_url, timeout=min(_navigate_timeout(), 90))
+    logger.info('Proxy warm-up complete')
 
 
 def get_chrome_options() -> ChromiumOptions:
